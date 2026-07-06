@@ -1,6 +1,8 @@
-﻿import { useEffect, useState } from "react";
+﻿import type { FormEvent } from "react";
+import { useEffect, useState } from "react";
 import type {
   ApiAccount,
+  ApiAccountFormInput,
   AppSnapshot,
   Product,
   RankTrackingJob,
@@ -10,7 +12,13 @@ import type {
 import { DataGrid } from "./components/DataGrid";
 import { SparklineBars } from "./components/SparklineBars";
 import { StatusBadge } from "./components/StatusBadge";
-import { fetchSnapshot, runTrackingJob } from "./lib/api";
+import {
+  createApiAccount,
+  fetchSnapshot,
+  runTrackingJob,
+  testApiAccountConnection,
+  updateApiAccount
+} from "./lib/api";
 
 type ViewKey = "dashboard" | "accounts" | "products" | "experiments" | "tracking" | "results";
 
@@ -22,6 +30,19 @@ const navItems: Array<{ key: ViewKey; label: string }> = [
   { key: "tracking", label: "추적 작업" },
   { key: "results", label: "랭킹 결과" }
 ];
+
+const defaultApiAccountForm: ApiAccountFormInput = {
+  name: "",
+  type: "COMMERCE",
+  clientId: "",
+  clientSecret: "",
+  accessLicense: "",
+  secretKey: "",
+  customerId: "",
+  storeId: "",
+  channelId: "",
+  isActive: true
+};
 
 export function App() {
   const [view, setView] = useState<ViewKey>("dashboard");
@@ -47,6 +68,23 @@ export function App() {
 
   async function handleRunJob(jobId: string) {
     await runTrackingJob(jobId);
+    await loadSnapshot();
+  }
+
+  async function handleCreateApiAccount(input: ApiAccountFormInput) {
+    await createApiAccount(input);
+    await loadSnapshot();
+  }
+
+  async function handleTestApiAccount(accountId: string) {
+    await testApiAccountConnection(accountId);
+    await loadSnapshot();
+  }
+
+  async function handleToggleApiAccount(account: ApiAccount) {
+    await updateApiAccount(account.id, {
+      isActive: !account.isActive
+    });
     await loadSnapshot();
   }
 
@@ -80,7 +118,14 @@ export function App() {
         {!loading && !error && snapshot && (
           <>
             {view === "dashboard" && <DashboardView snapshot={snapshot} />}
-            {view === "accounts" && <ApiAccountsView accounts={snapshot.apiAccounts} />}
+            {view === "accounts" && (
+              <ApiAccountsView
+                accounts={snapshot.apiAccounts}
+                onCreateAccount={handleCreateApiAccount}
+                onTestAccount={handleTestApiAccount}
+                onToggleAccount={handleToggleApiAccount}
+              />
+            )}
             {view === "products" && <ProductsView products={snapshot.products} />}
             {view === "experiments" && <ExperimentsView experiments={snapshot.experiments} />}
             {view === "tracking" && <TrackingJobsView jobs={snapshot.jobs} onRunJob={handleRunJob} />}
@@ -126,7 +171,32 @@ function DashboardView({ snapshot }: { snapshot: AppSnapshot }) {
   );
 }
 
-function ApiAccountsView({ accounts }: { accounts: ApiAccount[] }) {
+function ApiAccountsView({
+  accounts,
+  onCreateAccount,
+  onTestAccount,
+  onToggleAccount
+}: {
+  accounts: ApiAccount[];
+  onCreateAccount: (input: ApiAccountFormInput) => Promise<void>;
+  onTestAccount: (accountId: string) => Promise<void>;
+  onToggleAccount: (account: ApiAccount) => Promise<void>;
+}) {
+  const [form, setForm] = useState<ApiAccountFormInput>(defaultApiAccountForm);
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSubmitting(true);
+
+    try {
+      await onCreateAccount(form);
+      setForm(defaultApiAccountForm);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   return (
     <section className="panel">
       <div className="section-heading">
@@ -135,6 +205,82 @@ function ApiAccountsView({ accounts }: { accounts: ApiAccount[] }) {
           <h2>네이버 API 계정</h2>
         </div>
       </div>
+      <form className="account-form" onSubmit={handleSubmit}>
+        <label>
+          <span>계정명</span>
+          <input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} required />
+        </label>
+        <label>
+          <span>유형</span>
+          <select
+            value={form.type}
+            onChange={(event) => setForm({ ...form, type: event.target.value as ApiAccountFormInput["type"] })}
+          >
+            <option value="COMMERCE">네이버 커머스API</option>
+            <option value="SEARCH_AD">네이버 검색광고API</option>
+            <option value="CUSTOM">기타 확장용</option>
+          </select>
+        </label>
+        <label>
+          <span>Client ID</span>
+          <input
+            value={form.clientId}
+            onChange={(event) => setForm({ ...form, clientId: event.target.value })}
+            required
+          />
+        </label>
+        <label>
+          <span>Client Secret</span>
+          <input
+            value={form.clientSecret}
+            onChange={(event) => setForm({ ...form, clientSecret: event.target.value })}
+            required
+          />
+        </label>
+        <label>
+          <span>Access License</span>
+          <input
+            value={form.accessLicense ?? ""}
+            onChange={(event) => setForm({ ...form, accessLicense: event.target.value })}
+          />
+        </label>
+        <label>
+          <span>Secret Key</span>
+          <input
+            value={form.secretKey ?? ""}
+            onChange={(event) => setForm({ ...form, secretKey: event.target.value })}
+          />
+        </label>
+        <label>
+          <span>Customer ID</span>
+          <input
+            value={form.customerId ?? ""}
+            onChange={(event) => setForm({ ...form, customerId: event.target.value })}
+          />
+        </label>
+        <label>
+          <span>Store ID</span>
+          <input value={form.storeId ?? ""} onChange={(event) => setForm({ ...form, storeId: event.target.value })} />
+        </label>
+        <label>
+          <span>Channel ID</span>
+          <input
+            value={form.channelId ?? ""}
+            onChange={(event) => setForm({ ...form, channelId: event.target.value })}
+          />
+        </label>
+        <label className="checkbox-field">
+          <input
+            type="checkbox"
+            checked={form.isActive}
+            onChange={(event) => setForm({ ...form, isActive: event.target.checked })}
+          />
+          <span>사용 여부</span>
+        </label>
+        <button type="submit" className="action-button" disabled={submitting}>
+          {submitting ? "저장 중..." : "계정 등록"}
+        </button>
+      </form>
       <DataGrid
         columns={[
           { key: "name", title: "계정명", width: 180, sticky: true },
@@ -148,6 +294,27 @@ function ApiAccountsView({ accounts }: { accounts: ApiAccount[] }) {
             title: "상태",
             width: 120,
             render: (row) => <StatusBadge value={row.connectionStatus} />
+          },
+          {
+            key: "isActive",
+            title: "사용",
+            width: 100,
+            render: (row) => <StatusBadge value={row.isActive ? "CONNECTED" : "PAUSED"} />
+          },
+          {
+            key: "actions",
+            title: "작업",
+            width: 220,
+            render: (row) => (
+              <div className="inline-actions">
+                <button type="button" className="action-button secondary" onClick={() => void onTestAccount(row.id)}>
+                  연결 테스트
+                </button>
+                <button type="button" className="action-button secondary" onClick={() => void onToggleAccount(row)}>
+                  {row.isActive ? "비활성화" : "활성화"}
+                </button>
+              </div>
+            )
           }
         ]}
         rows={accounts}

@@ -1,4 +1,4 @@
-:root {
+﻿:root {
   font-family: "Segoe UI", "Pretendard", sans-serif;
   color: #1d2838;
   background:
@@ -173,6 +173,51 @@ button {
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.account-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px;
+}
+
+.account-form label {
+  display: grid;
+  gap: 6px;
+  font-size: 14px;
+  color: #4e5c70;
+}
+
+.account-form input,
+.account-form select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid rgba(18, 31, 50, 0.16);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.checkbox-field {
+  display: flex !important;
+  align-items: center;
+  gap: 10px;
+  align-self: end;
+  min-height: 42px;
+}
+
+.checkbox-field input {
+  width: auto;
+}
+
+.inline-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.action-button.secondary {
+  padding: 10px 12px;
+  color: #173454;
+  background: #e5eef6;
 }
 
 .grid-shell {

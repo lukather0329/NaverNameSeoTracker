@@ -1,4 +1,4 @@
-export type ApiAccountType = "COMMERCE" | "SEARCH_AD" | "CUSTOM";
+﻿export type ApiAccountType = "COMMERCE" | "SEARCH_AD" | "CUSTOM";
 export type ConnectionStatus = "CONNECTED" | "FAILED" | "UNVERIFIED" | "EXPIRED";
 export type ProductStatus = "ON_SALE" | "PAUSED" | "SOLD_OUT";
 export type TestStatus = "DRAFT" | "RUNNING" | "PAUSED" | "COMPLETED" | "FAILED";
@@ -23,6 +23,19 @@ export interface ApiAccount {
   connectionStatus: ConnectionStatus;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ApiAccountFormInput {
+  name: string;
+  type: ApiAccountType;
+  clientId: string;
+  clientSecret: string;
+  accessLicense?: string;
+  secretKey?: string;
+  customerId?: string;
+  storeId?: string;
+  channelId?: string;
+  isActive: boolean;
 }
 
 export interface Product {

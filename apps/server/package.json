@@ -1,0 +1,30 @@
+﻿{
+  "name": "@naver-seo-tracker/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc -p tsconfig.json",
+    "lint": "tsc --noEmit -p tsconfig.json",
+    "prisma:generate": "prisma generate --schema ../../prisma/schema.prisma",
+    "prisma:migrate": "prisma migrate dev --schema ../../prisma/schema.prisma --name init",
+    "prisma:seed": "tsx ../../prisma/seed.ts"
+  },
+  "dependencies": {
+    "@naver-seo-tracker/shared": "0.1.0",
+    "@prisma/client": "^6.11.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.0",
+    "node-cron": "^4.1.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "prisma": "^6.11.1",
+    "tsx": "^4.19.1",
+    "typescript": "^5.6.2"
+  }
+}

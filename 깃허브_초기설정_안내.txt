@@ -1,0 +1,21 @@
+이 폴더에는 Git 배치파일이 준비되어 있습니다.
+
+1. 현재 상태
+- D:\Codex\NaverNameSeoTracker\.git 폴더는 비어 있습니다.
+- 즉, 아직 정상적인 Git 저장소가 아닙니다.
+
+2. 먼저 해야 할 일
+- 새 저장소로 시작: git init
+- 기존 GitHub 저장소 연결:
+  git init
+  git remote add origin https://github.com/USER/REPO.git
+  git branch -M main
+
+3. 배치파일 설명
+- 깃허브_받기.bat: 현재 브랜치 pull --rebase
+- 깃허브_푸시.bat: add, commit, push
+- 깃허브_동기화.bat: add, commit, pull --rebase, push
+
+4. 권장 흐름
+- 처음 한 번: 저장소 초기화 후 origin 연결
+- 이후 일반 작업: 깃허브_동기화.bat

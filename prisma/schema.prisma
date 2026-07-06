@@ -1,0 +1,160 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model ApiAccount {
+  id               String   @id @default(cuid())
+  name             String
+  type             String
+  clientId         String
+  clientSecret     String
+  accessLicense    String?
+  secretKey        String?
+  customerId       String?
+  storeId          String?
+  channelId        String?
+  isActive         Boolean  @default(true)
+  lastCheckedAt    DateTime?
+  connectionStatus String   @default("UNVERIFIED")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model Product {
+  id                   String            @id @default(cuid())
+  smartStoreProductId  String            @unique
+  originProductId      String?
+  channelProductId     String?
+  sellerManagementCode String?
+  currentTitle         String
+  originalTitle        String?
+  seoOptimizedTitle    String?
+  primaryKeyword       String?
+  trackingKeywords     String
+  category             String?
+  price                Int
+  productStatus        String            @default("ON_SALE")
+  testStatus           String            @default("DRAFT")
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+  titleCandidates      SeoTitleCandidate[]
+  titleChangeLogs      TitleChangeLog[]
+  experiments          SeoExperiment[]
+  rankJobs             RankTrackingJob[]
+  rankResults          RankTrackingResult[]
+}
+
+model SeoTitleCandidate {
+  id        String   @id @default(cuid())
+  productId String
+  source    String
+  title     String
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
+
+model TitleChangeLog {
+  id         String   @id @default(cuid())
+  productId  String
+  beforeTitle String
+  afterTitle String
+  appliedAt  DateTime?
+  mode       String
+  result     String
+  reason     String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
+
+model SeoExperiment {
+  id                  String            @id @default(cuid())
+  name                String
+  productId           String
+  beforeTitle         String
+  afterTitle          String
+  appliedAt           DateTime?
+  trackingInterval    String
+  startDate           DateTime
+  endDate             DateTime?
+  status              String            @default("DRAFT")
+  summary             String?
+  judgement           String            @default("PENDING")
+  minObservationHours Int               @default(24)
+  notes               String?
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  product             Product           @relation(fields: [productId], references: [id], onDelete: Cascade)
+  keywords            ExperimentKeyword[]
+  rankJobs            RankTrackingJob[]
+  rankResults         RankTrackingResult[]
+}
+
+model ExperimentKeyword {
+  id           String        @id @default(cuid())
+  experimentId String
+  keyword      String
+  isPrimary    Boolean       @default(false)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  experiment   SeoExperiment @relation(fields: [experimentId], references: [id], onDelete: Cascade)
+}
+
+model RankTrackingJob {
+  id           String        @id @default(cuid())
+  experimentId String
+  productId    String
+  keyword      String
+  interval     String
+  provider     String
+  isEnabled    Boolean       @default(true)
+  lastRunAt    DateTime?
+  nextRunAt    DateTime?
+  status       String        @default("DRAFT")
+  retryCount   Int           @default(0)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  experiment   SeoExperiment @relation(fields: [experimentId], references: [id], onDelete: Cascade)
+  product      Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
+  results      RankTrackingResult[]
+}
+
+model RankTrackingResult {
+  id             String        @id @default(cuid())
+  jobId           String
+  experimentId    String
+  productId       String
+  keyword         String
+  trackedAt       DateTime
+  currentRank     Int?
+  previousRank    Int?
+  initialRank     Int?
+  beforeTitleRank Int?
+  delta           Int?
+  deltaStatus     String
+  searchPage      Int?
+  foundTitle      String?
+  foundProductRef String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  job             RankTrackingJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  experiment      SeoExperiment @relation(fields: [experimentId], references: [id], onDelete: Cascade)
+  product         Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
+
+model SystemLog {
+  id        String   @id @default(cuid())
+  level     String
+  scope     String
+  message   String
+  metaJson  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

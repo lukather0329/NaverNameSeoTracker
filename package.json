@@ -1,0 +1,22 @@
+{
+  "name": "naver-name-seo-tracker",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:web\"",
+    "dev:server": "npm --workspace @naver-seo-tracker/server run dev",
+    "dev:web": "npm --workspace @naver-seo-tracker/web run dev",
+    "build": "npm run build --workspaces",
+    "lint": "npm run lint --workspaces",
+    "prisma:generate": "npm --workspace @naver-seo-tracker/server run prisma:generate",
+    "prisma:migrate": "npm --workspace @naver-seo-tracker/server run prisma:migrate",
+    "prisma:seed": "npm --workspace @naver-seo-tracker/server run prisma:seed"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.1"
+  }
+}

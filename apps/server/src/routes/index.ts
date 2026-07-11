@@ -36,6 +36,9 @@ const productSchema = z.object({
   testStatus: z.enum(["DRAFT", "RUNNING", "PAUSED", "COMPLETED", "FAILED"]).default("DRAFT")
 });
 
+const productUpdateSchema = productSchema.partial();
+const bulkProductSchema = z.object({ rows: z.array(productSchema).min(1) });
+
 const experimentSchema = z.object({
   name: z.string().min(1),
   productId: z.string().min(1),
@@ -125,6 +128,35 @@ router.post("/products", async (req, res) => {
   });
 
   res.status(201).json(product);
+});
+
+router.put("/products/:id", async (req, res) => {
+  const input = productUpdateSchema.parse(req.body);
+  const product = await prisma.product.update({
+    where: { id: req.params.id },
+    data: {
+      ...input,
+      trackingKeywords: input.trackingKeywords ? input.trackingKeywords.join(",") : undefined
+    }
+  });
+
+  res.json(product);
+});
+
+router.post("/products/bulk", async (req, res) => {
+  const { rows } = bulkProductSchema.parse(req.body);
+  const result = await prisma.$transaction(
+    rows.map((row) =>
+      prisma.product.create({
+        data: {
+          ...row,
+          trackingKeywords: row.trackingKeywords.join(",")
+        }
+      })
+    )
+  );
+
+  res.status(201).json({ ok: true, count: result.length });
 });
 
 router.post("/title-candidates", async (req, res) => {

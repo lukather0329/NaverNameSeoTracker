@@ -1,4 +1,4 @@
-export type ApiAccountType = "COMMERCE" | "SEARCH_AD" | "CUSTOM";
+﻿export type ApiAccountType = "COMMERCE" | "SEARCH_AD" | "CUSTOM";
 export type ConnectionStatus = "CONNECTED" | "FAILED" | "UNVERIFIED" | "EXPIRED";
 export type ProductStatus = "ON_SALE" | "PAUSED" | "SOLD_OUT";
 export type TestStatus = "DRAFT" | "RUNNING" | "PAUSED" | "COMPLETED" | "FAILED";
@@ -42,6 +42,22 @@ export interface Product {
   testStatus: TestStatus;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ProductFormInput {
+  smartStoreProductId: string;
+  originProductId?: string;
+  channelProductId?: string;
+  sellerManagementCode?: string;
+  currentTitle: string;
+  originalTitle?: string;
+  seoOptimizedTitle?: string;
+  primaryKeyword?: string;
+  trackingKeywords: string[];
+  category?: string;
+  price: number;
+  productStatus: ProductStatus;
+  testStatus: TestStatus;
 }
 
 export interface SeoTitleCandidate {

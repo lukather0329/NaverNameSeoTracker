@@ -1,8 +1,10 @@
-﻿import { useEffect, useState } from "react";
+﻿import type { FormEvent } from "react";
+import { useEffect, useState } from "react";
 import type {
   ApiAccount,
   AppSnapshot,
   Product,
+  ProductFormInput,
   RankTrackingJob,
   RankTrackingResult,
   SeoExperiment
@@ -10,7 +12,7 @@ import type {
 import { DataGrid } from "./components/DataGrid";
 import { SparklineBars } from "./components/SparklineBars";
 import { StatusBadge } from "./components/StatusBadge";
-import { fetchSnapshot, runTrackingJob } from "./lib/api";
+import { bulkCreateProducts, createProduct, fetchSnapshot, runTrackingJob, updateProduct } from "./lib/api";
 
 type ViewKey = "dashboard" | "accounts" | "products" | "experiments" | "tracking" | "results";
 
@@ -22,6 +24,22 @@ const navItems: Array<{ key: ViewKey; label: string }> = [
   { key: "tracking", label: "추적 작업" },
   { key: "results", label: "랭킹 결과" }
 ];
+
+const defaultProductForm: ProductFormInput = {
+  smartStoreProductId: "",
+  originProductId: "",
+  channelProductId: "",
+  sellerManagementCode: "",
+  currentTitle: "",
+  originalTitle: "",
+  seoOptimizedTitle: "",
+  primaryKeyword: "",
+  trackingKeywords: [],
+  category: "",
+  price: 0,
+  productStatus: "ON_SALE",
+  testStatus: "DRAFT"
+};
 
 export function App() {
   const [view, setView] = useState<ViewKey>("dashboard");
@@ -47,6 +65,23 @@ export function App() {
 
   async function handleRunJob(jobId: string) {
     await runTrackingJob(jobId);
+    await loadSnapshot();
+  }
+
+  async function handleCreateProduct(input: ProductFormInput) {
+    await createProduct(input);
+    await loadSnapshot();
+  }
+
+  async function handleBulkCreateProducts(rows: ProductFormInput[]) {
+    await bulkCreateProducts(rows);
+    await loadSnapshot();
+  }
+
+  async function handleToggleProductStatus(product: Product) {
+    await updateProduct(product.id, {
+      productStatus: product.productStatus === "ON_SALE" ? "PAUSED" : "ON_SALE"
+    });
     await loadSnapshot();
   }
 
@@ -81,7 +116,14 @@ export function App() {
           <>
             {view === "dashboard" && <DashboardView snapshot={snapshot} />}
             {view === "accounts" && <ApiAccountsView accounts={snapshot.apiAccounts} />}
-            {view === "products" && <ProductsView products={snapshot.products} />}
+            {view === "products" && (
+              <ProductsView
+                products={snapshot.products}
+                onCreateProduct={handleCreateProduct}
+                onBulkCreateProducts={handleBulkCreateProducts}
+                onToggleProductStatus={handleToggleProductStatus}
+              />
+            )}
             {view === "experiments" && <ExperimentsView experiments={snapshot.experiments} />}
             {view === "tracking" && <TrackingJobsView jobs={snapshot.jobs} onRunJob={handleRunJob} />}
             {view === "results" && <ResultsView results={snapshot.results} />}
@@ -156,7 +198,73 @@ function ApiAccountsView({ accounts }: { accounts: ApiAccount[] }) {
   );
 }
 
-function ProductsView({ products }: { products: Product[] }) {
+function ProductsView({
+  products,
+  onCreateProduct,
+  onBulkCreateProducts,
+  onToggleProductStatus
+}: {
+  products: Product[];
+  onCreateProduct: (input: ProductFormInput) => Promise<void>;
+  onBulkCreateProducts: (rows: ProductFormInput[]) => Promise<void>;
+  onToggleProductStatus: (product: Product) => Promise<void>;
+}) {
+  const [form, setForm] = useState<ProductFormInput>(defaultProductForm);
+  const [bulkText, setBulkText] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSubmitting(true);
+
+    try {
+      await onCreateProduct(form);
+      setForm(defaultProductForm);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleBulkSubmit() {
+    const rows = bulkText
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => {
+        const [smartStoreProductId, currentTitle, price, primaryKeyword, trackingKeywords, sellerManagementCode, category] =
+          line.split("|").map((item) => item.trim());
+
+        return {
+          smartStoreProductId,
+          currentTitle,
+          price: Number(price || 0),
+          primaryKeyword: primaryKeyword || "",
+          trackingKeywords: trackingKeywords ? trackingKeywords.split(",").map((item) => item.trim()).filter(Boolean) : [],
+          sellerManagementCode: sellerManagementCode || "",
+          category: category || "",
+          originProductId: "",
+          channelProductId: "",
+          originalTitle: currentTitle,
+          seoOptimizedTitle: "",
+          productStatus: "ON_SALE",
+          testStatus: "DRAFT"
+        } satisfies ProductFormInput;
+      });
+
+    if (!rows.length) {
+      return;
+    }
+
+    setSubmitting(true);
+
+    try {
+      await onBulkCreateProducts(rows);
+      setBulkText("");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   return (
     <section className="panel">
       <div className="section-heading">
@@ -165,6 +273,111 @@ function ProductsView({ products }: { products: Product[] }) {
           <h2>상품 목록</h2>
         </div>
       </div>
+      <form className="entity-form" onSubmit={handleSubmit}>
+        <label>
+          <span>스마트스토어 상품 ID</span>
+          <input
+            value={form.smartStoreProductId}
+            onChange={(event) => setForm({ ...form, smartStoreProductId: event.target.value })}
+            required
+          />
+        </label>
+        <label>
+          <span>판매자관리코드</span>
+          <input
+            value={form.sellerManagementCode ?? ""}
+            onChange={(event) => setForm({ ...form, sellerManagementCode: event.target.value })}
+          />
+        </label>
+        <label className="wide-field">
+          <span>현재 상품명</span>
+          <input value={form.currentTitle} onChange={(event) => setForm({ ...form, currentTitle: event.target.value })} required />
+        </label>
+        <label className="wide-field">
+          <span>SEO 상품명</span>
+          <input
+            value={form.seoOptimizedTitle ?? ""}
+            onChange={(event) => setForm({ ...form, seoOptimizedTitle: event.target.value })}
+          />
+        </label>
+        <label>
+          <span>대표 키워드</span>
+          <input
+            value={form.primaryKeyword ?? ""}
+            onChange={(event) => setForm({ ...form, primaryKeyword: event.target.value })}
+          />
+        </label>
+        <label>
+          <span>추적 키워드</span>
+          <input
+            value={form.trackingKeywords.join(", ")}
+            onChange={(event) =>
+              setForm({
+                ...form,
+                trackingKeywords: event.target.value.split(",").map((item) => item.trim()).filter(Boolean)
+              })
+            }
+          />
+        </label>
+        <label>
+          <span>카테고리</span>
+          <input value={form.category ?? ""} onChange={(event) => setForm({ ...form, category: event.target.value })} />
+        </label>
+        <label>
+          <span>판매가</span>
+          <input
+            type="number"
+            min="0"
+            value={form.price}
+            onChange={(event) => setForm({ ...form, price: Number(event.target.value) })}
+          />
+        </label>
+        <label>
+          <span>판매상태</span>
+          <select
+            value={form.productStatus}
+            onChange={(event) => setForm({ ...form, productStatus: event.target.value as ProductFormInput["productStatus"] })}
+          >
+            <option value="ON_SALE">판매중</option>
+            <option value="PAUSED">판매중지</option>
+            <option value="SOLD_OUT">품절</option>
+          </select>
+        </label>
+        <label>
+          <span>테스트 상태</span>
+          <select
+            value={form.testStatus}
+            onChange={(event) => setForm({ ...form, testStatus: event.target.value as ProductFormInput["testStatus"] })}
+          >
+            <option value="DRAFT">초안</option>
+            <option value="RUNNING">진행중</option>
+            <option value="PAUSED">보류</option>
+            <option value="COMPLETED">완료</option>
+            <option value="FAILED">실패</option>
+          </select>
+        </label>
+        <button type="submit" className="action-button" disabled={submitting}>
+          {submitting ? "저장 중..." : "상품 등록"}
+        </button>
+      </form>
+
+      <div className="bulk-panel">
+        <div>
+          <p className="eyebrow">대량 입력 준비</p>
+          <h3>CSV 전 단계 일괄 붙여넣기</h3>
+          <p className="help-text">형식: 상품ID|상품명|판매가|대표키워드|추적키워드1,추적키워드2|판매자관리코드|카테고리</p>
+        </div>
+        <textarea
+          className="bulk-textarea"
+          value={bulkText}
+          onChange={(event) => setBulkText(event.target.value)}
+          placeholder="SS-20001|대용량 텀블러 1L|25900|대용량 텀블러|대용량 텀블러,보온 텀블러|SELLER-001|주방용품"
+        />
+        <button type="button" className="action-button secondary" onClick={() => void handleBulkSubmit()} disabled={submitting}>
+          일괄 등록
+        </button>
+      </div>
+
       <DataGrid
         columns={[
           { key: "smartStoreProductId", title: "스마트스토어 상품 ID", width: 200, sticky: true },
@@ -180,10 +393,26 @@ function ProductsView({ products }: { products: Product[] }) {
           },
           { key: "price", title: "판매가", width: 120 },
           {
+            key: "productStatus",
+            title: "판매상태",
+            width: 120,
+            render: (row) => <StatusBadge value={row.productStatus} />
+          },
+          {
             key: "testStatus",
             title: "테스트 상태",
             width: 130,
             render: (row) => <StatusBadge value={row.testStatus} />
+          },
+          {
+            key: "actions",
+            title: "작업",
+            width: 140,
+            render: (row) => (
+              <button type="button" className="action-button secondary" onClick={() => void onToggleProductStatus(row)}>
+                {row.productStatus === "ON_SALE" ? "판매중지" : "판매재개"}
+              </button>
+            )
           }
         ]}
         rows={products}

@@ -1,4 +1,4 @@
-:root {
+﻿:root {
   font-family: "Segoe UI", "Pretendard", sans-serif;
   color: #1d2838;
   background:
@@ -18,7 +18,7 @@ body {
   min-height: 100vh;
 }
 
-button {
+button, input, select, textarea {
   font: inherit;
 }
 
@@ -40,7 +40,8 @@ button {
 }
 
 .sidebar h1,
-.content h2 {
+.content h2,
+.bulk-panel h3 {
   margin: 0;
 }
 
@@ -89,6 +90,11 @@ button {
   padding: 12px 16px;
   color: #102034;
   background: linear-gradient(135deg, #f0c78c, #ffdcae);
+}
+
+.action-button.secondary {
+  color: #173454;
+  background: #e5eef6;
 }
 
 .content {
@@ -175,6 +181,52 @@ button {
   align-items: center;
 }
 
+.entity-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px;
+}
+
+.entity-form label {
+  display: grid;
+  gap: 6px;
+  color: #4e5c70;
+  font-size: 14px;
+}
+
+.entity-form input,
+.entity-form select,
+.bulk-textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid rgba(18, 31, 50, 0.16);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.wide-field {
+  grid-column: span 2;
+}
+
+.bulk-panel {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 18px;
+  background: rgba(236, 242, 248, 0.9);
+}
+
+.bulk-textarea {
+  min-height: 120px;
+  resize: vertical;
+}
+
+.help-text {
+  margin: 8px 0 0;
+  color: #67758a;
+  font-size: 13px;
+}
+
 .grid-shell {
   overflow: auto;
   border-radius: 18px;
@@ -239,7 +291,8 @@ button {
 .status-connected,
 .status-running,
 .status-up,
-.status-effective {
+.status-effective,
+.status-on_sale {
   color: #0e6438;
   background: rgba(59, 169, 108, 0.14);
 }
@@ -262,7 +315,9 @@ button {
 .status-expired,
 .status-paused,
 .status-low_effect,
-.status-out {
+.status-out,
+.status-sold_out,
+.status-completed {
   color: #8b5b18;
   background: rgba(240, 199, 140, 0.26);
 }
@@ -282,5 +337,9 @@ button {
 
   .hero {
     grid-template-columns: 1fr;
+  }
+
+  .wide-field {
+    grid-column: span 1;
   }
 }

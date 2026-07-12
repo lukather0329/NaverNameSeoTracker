@@ -1,4 +1,4 @@
-export type ApiAccountType = "COMMERCE" | "SEARCH_AD" | "CUSTOM";
+﻿export type ApiAccountType = "COMMERCE" | "SEARCH_AD" | "CUSTOM";
 export type ConnectionStatus = "CONNECTED" | "FAILED" | "UNVERIFIED" | "EXPIRED";
 export type ProductStatus = "ON_SALE" | "PAUSED" | "SOLD_OUT";
 export type TestStatus = "DRAFT" | "RUNNING" | "PAUSED" | "COMPLETED" | "FAILED";
@@ -54,6 +54,13 @@ export interface SeoTitleCandidate {
   updatedAt: string;
 }
 
+export interface SeoTitleCandidateFormInput {
+  productId: string;
+  source: "MANUAL" | "CSV" | "MVP_ADAPTER";
+  title: string;
+  notes?: string;
+}
+
 export interface TitleChangeLog {
   id: string;
   productId: string;
@@ -65,6 +72,13 @@ export interface TitleChangeLog {
   reason?: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface TitleApplyInput {
+  candidateId?: string;
+  afterTitle: string;
+  mode: "VALIDATION" | "LIVE";
+  reason?: string;
 }
 
 export interface RankTrackingJob {

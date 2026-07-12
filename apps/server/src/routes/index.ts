@@ -55,6 +55,13 @@ const titleCandidateSchema = z.object({
   notes: z.string().optional()
 });
 
+const applyTitleSchema = z.object({
+  candidateId: z.string().optional(),
+  afterTitle: z.string().min(1),
+  mode: z.enum(["VALIDATION", "LIVE"]),
+  reason: z.string().optional()
+});
+
 router.get("/health", (_req, res) => {
   res.json({ ok: true, service: "naver-name-seo-tracker-api" });
 });
@@ -66,7 +73,7 @@ router.get("/snapshot", async (_req, res) => {
       prisma.apiAccount.findMany({ orderBy: { createdAt: "desc" } }),
       prisma.product.findMany({ orderBy: { createdAt: "desc" } }),
       prisma.seoTitleCandidate.findMany({ orderBy: { createdAt: "desc" } }),
-      prisma.titleChangeLog.findMany({ orderBy: { createdAt: "desc" } }),
+      prisma.titleChangeLog.findMany({ orderBy: { createdAt: "createdAt" } }),
       prisma.seoExperiment.findMany({ orderBy: { createdAt: "desc" } }),
       prisma.rankTrackingJob.findMany({ orderBy: { createdAt: "desc" } }),
       prisma.rankTrackingResult.findMany({ orderBy: { trackedAt: "desc" }, take: 100 })
@@ -125,6 +132,79 @@ router.post("/products", async (req, res) => {
   });
 
   res.status(201).json(product);
+});
+
+router.post("/products/:id/apply-title", async (req, res) => {
+  const input = applyTitleSchema.parse(req.body);
+  const product = await prisma.product.findUnique({ where: { id: req.params.id } });
+
+  if (!product) {
+    res.status(404).json({ ok: false, message: "Product not found" });
+    return;
+  }
+
+  const beforeTitle = product.currentTitle;
+  const nextCurrentTitle = input.mode === "LIVE" ? input.afterTitle : product.currentTitle;
+
+  await prisma.$transaction([
+    prisma.product.update({
+      where: { id: product.id },
+      data: {
+        currentTitle: nextCurrentTitle,
+        originalTitle: product.originalTitle ?? beforeTitle,
+        seoOptimizedTitle: input.afterTitle
+      }
+    }),
+    prisma.titleChangeLog.create({
+      data: {
+        productId: product.id,
+        beforeTitle,
+        afterTitle: input.afterTitle,
+        appliedAt: new Date(),
+        mode: input.mode,
+        result: "SUCCESS",
+        reason: input.reason
+      }
+    })
+  ]);
+
+  res.json({
+    ok: true,
+    message: input.mode === "LIVE" ? "SEO 상품명이 실제 상품명에 반영되었습니다." : "검증 모드 적용 이력이 저장되었습니다."
+  });
+});
+
+router.post("/products/:id/rollback-title", async (req, res) => {
+  const product = await prisma.product.findUnique({ where: { id: req.params.id } });
+
+  if (!product) {
+    res.status(404).json({ ok: false, message: "Product not found" });
+    return;
+  }
+
+  const rollbackTitle = product.originalTitle ?? product.currentTitle;
+
+  await prisma.$transaction([
+    prisma.product.update({
+      where: { id: product.id },
+      data: {
+        currentTitle: rollbackTitle
+      }
+    }),
+    prisma.titleChangeLog.create({
+      data: {
+        productId: product.id,
+        beforeTitle: product.currentTitle,
+        afterTitle: rollbackTitle,
+        appliedAt: new Date(),
+        mode: "LIVE",
+        result: "ROLLED_BACK",
+        reason: "Manual rollback"
+      }
+    })
+  ]);
+
+  res.json({ ok: true, message: "상품명이 이전 값으로 롤백되었습니다." });
 });
 
 router.post("/title-candidates", async (req, res) => {

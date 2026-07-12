@@ -5,23 +5,33 @@ import type {
   Product,
   RankTrackingJob,
   RankTrackingResult,
+  SeoTitleCandidate,
+  SeoTitleCandidateFormInput,
   SeoExperiment
 } from "@naver-seo-tracker/shared";
 import { DataGrid } from "./components/DataGrid";
 import { SparklineBars } from "./components/SparklineBars";
 import { StatusBadge } from "./components/StatusBadge";
-import { fetchSnapshot, runTrackingJob } from "./lib/api";
+import { applySeoTitle, createSeoTitleCandidate, fetchSnapshot, rollbackSeoTitle, runTrackingJob } from "./lib/api";
 
-type ViewKey = "dashboard" | "accounts" | "products" | "experiments" | "tracking" | "results";
+type ViewKey = "dashboard" | "accounts" | "products" | "seo" | "experiments" | "tracking" | "results";
 
 const navItems: Array<{ key: ViewKey; label: string }> = [
   { key: "dashboard", label: "대시보드" },
   { key: "accounts", label: "API 계정" },
   { key: "products", label: "상품 목록" },
+  { key: "seo", label: "SEO 적용" },
   { key: "experiments", label: "실험 관리" },
   { key: "tracking", label: "추적 작업" },
   { key: "results", label: "랭킹 결과" }
 ];
+
+const defaultSeoCandidateForm: SeoTitleCandidateFormInput = {
+  productId: "",
+  source: "MANUAL",
+  title: "",
+  notes: ""
+};
 
 export function App() {
   const [view, setView] = useState<ViewKey>("dashboard");
@@ -47,6 +57,26 @@ export function App() {
 
   async function handleRunJob(jobId: string) {
     await runTrackingJob(jobId);
+    await loadSnapshot();
+  }
+
+  async function handleCreateSeoCandidate(input: SeoTitleCandidateFormInput) {
+    await createSeoTitleCandidate(input);
+    await loadSnapshot();
+  }
+
+  async function handleApplySeoTitle(productId: string, candidate: SeoTitleCandidate, mode: "VALIDATION" | "LIVE") {
+    await applySeoTitle(productId, {
+      candidateId: candidate.id,
+      afterTitle: candidate.title,
+      mode,
+      reason: mode === "LIVE" ? "Manual live apply from SEO screen" : "Validation mode preview"
+    });
+    await loadSnapshot();
+  }
+
+  async function handleRollbackSeoTitle(productId: string) {
+    await rollbackSeoTitle(productId);
     await loadSnapshot();
   }
 
@@ -82,6 +112,16 @@ export function App() {
             {view === "dashboard" && <DashboardView snapshot={snapshot} />}
             {view === "accounts" && <ApiAccountsView accounts={snapshot.apiAccounts} />}
             {view === "products" && <ProductsView products={snapshot.products} />}
+            {view === "seo" && (
+              <SeoTitleApplyView
+                products={snapshot.products}
+                candidates={snapshot.seoTitleCandidates}
+                logs={snapshot.titleChangeLogs}
+                onCreateCandidate={handleCreateSeoCandidate}
+                onApplyTitle={handleApplySeoTitle}
+                onRollbackTitle={handleRollbackSeoTitle}
+              />
+            )}
             {view === "experiments" && <ExperimentsView experiments={snapshot.experiments} />}
             {view === "tracking" && <TrackingJobsView jobs={snapshot.jobs} onRunJob={handleRunJob} />}
             {view === "results" && <ResultsView results={snapshot.results} />}
@@ -187,6 +227,137 @@ function ProductsView({ products }: { products: Product[] }) {
           }
         ]}
         rows={products}
+      />
+    </section>
+  );
+}
+
+function SeoTitleApplyView({
+  products,
+  candidates,
+  logs,
+  onCreateCandidate,
+  onApplyTitle,
+  onRollbackTitle
+}: {
+  products: Product[];
+  candidates: SeoTitleCandidate[];
+  logs: AppSnapshot["titleChangeLogs"];
+  onCreateCandidate: (input: SeoTitleCandidateFormInput) => Promise<void>;
+  onApplyTitle: (productId: string, candidate: SeoTitleCandidate, mode: "VALIDATION" | "LIVE") => Promise<void>;
+  onRollbackTitle: (productId: string) => Promise<void>;
+}) {
+  const [form, setForm] = useState<SeoTitleCandidateFormInput>(defaultSeoCandidateForm);
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSubmitting(true);
+
+    try {
+      await onCreateCandidate(form);
+      setForm(defaultSeoCandidateForm);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <section className="panel">
+      <div className="section-heading">
+        <div>
+          <p className="eyebrow">SEO Workflow</p>
+          <h2>SEO 상품명 적용</h2>
+        </div>
+      </div>
+      <form className="entity-form" onSubmit={handleSubmit}>
+        <label>
+          <span>상품</span>
+          <select value={form.productId} onChange={(event) => setForm({ ...form, productId: event.target.value })} required>
+            <option value="">상품 선택</option>
+            {products.map((product) => (
+              <option key={product.id} value={product.id}>
+                {product.smartStoreProductId} | {product.currentTitle}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          <span>후보 출처</span>
+          <select value={form.source} onChange={(event) => setForm({ ...form, source: event.target.value as SeoTitleCandidateFormInput["source"] })}>
+            <option value="MANUAL">수동 입력</option>
+            <option value="CSV">CSV</option>
+            <option value="MVP_ADAPTER">MVP 연동</option>
+          </select>
+        </label>
+        <label className="wide-field">
+          <span>SEO 후보 상품명</span>
+          <input value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} required />
+        </label>
+        <label className="wide-field">
+          <span>메모</span>
+          <input value={form.notes ?? ""} onChange={(event) => setForm({ ...form, notes: event.target.value })} />
+        </label>
+        <button type="submit" className="action-button" disabled={submitting}>
+          {submitting ? "저장 중..." : "후보 등록"}
+        </button>
+      </form>
+      <DataGrid
+        columns={[
+          {
+            key: "productId",
+            title: "대상 상품",
+            width: 240,
+            sticky: true,
+            render: (row) => {
+              const product = products.find((item) => item.id === row.productId);
+              return product ? `${product.smartStoreProductId} | ${product.currentTitle}` : row.productId;
+            }
+          },
+          { key: "source", title: "출처", width: 120 },
+          { key: "title", title: "SEO 후보 상품명", width: 340 },
+          { key: "notes", title: "메모", width: 200 },
+          {
+            key: "actions",
+            title: "적용",
+            width: 300,
+            render: (row) => (
+              <div className="inline-actions">
+                <button type="button" className="action-button secondary" onClick={() => void onApplyTitle(row.productId, row, "VALIDATION")}>
+                  검증 모드
+                </button>
+                <button type="button" className="action-button secondary" onClick={() => void onApplyTitle(row.productId, row, "LIVE")}>
+                  실제 적용
+                </button>
+                <button type="button" className="action-button secondary" onClick={() => void onRollbackTitle(row.productId)}>
+                  롤백
+                </button>
+              </div>
+            )
+          }
+        ]}
+        rows={candidates}
+      />
+      <DataGrid
+        columns={[
+          { key: "productId", title: "상품 ID", width: 180, sticky: true },
+          { key: "beforeTitle", title: "변경 전", width: 280 },
+          { key: "afterTitle", title: "변경 후", width: 320 },
+          {
+            key: "mode",
+            title: "모드",
+            width: 120,
+            render: (row) => <StatusBadge value={row.mode} />
+          },
+          {
+            key: "result",
+            title: "결과",
+            width: 140,
+            render: (row) => <StatusBadge value={row.result} />
+          },
+          { key: "reason", title: "사유", width: 220 }
+        ]}
+        rows={logs}
       />
     </section>
   );

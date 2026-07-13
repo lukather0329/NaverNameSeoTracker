@@ -55,6 +55,17 @@ const titleCandidateSchema = z.object({
   notes: z.string().optional()
 });
 
+const jobSchema = z.object({
+  experimentId: z.string().min(1),
+  productId: z.string().min(1),
+  keyword: z.string().min(1),
+  interval: z.enum(["30_MINUTES", "60_MINUTES"]),
+  provider: z.enum(["MOCK", "NAVER_SHOPPING", "FUTURE_API"]),
+  isEnabled: z.boolean().default(true)
+});
+
+const jobUpdateSchema = jobSchema.partial();
+
 router.get("/health", (_req, res) => {
   res.json({ ok: true, service: "naver-name-seo-tracker-api" });
 });
@@ -155,6 +166,29 @@ router.post("/experiments", async (req, res) => {
   });
 
   res.status(201).json(experiment);
+});
+
+router.post("/jobs", async (req, res) => {
+  const input = jobSchema.parse(req.body);
+  const job = await prisma.rankTrackingJob.create({
+    data: {
+      ...input,
+      status: "DRAFT",
+      retryCount: 0
+    }
+  });
+
+  res.status(201).json(job);
+});
+
+router.put("/jobs/:id", async (req, res) => {
+  const input = jobUpdateSchema.parse(req.body);
+  const job = await prisma.rankTrackingJob.update({
+    where: { id: req.params.id },
+    data: input
+  });
+
+  res.json(job);
 });
 
 router.post("/jobs/:id/run", async (req, res) => {

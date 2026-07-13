@@ -4,13 +4,16 @@ import type {
   AppSnapshot,
   Product,
   RankTrackingJob,
+  RankTrackingJobFormInput,
   RankTrackingResult,
-  SeoExperiment
+  RankProviderKind,
+  SeoExperiment,
+  TrackingInterval
 } from "@naver-seo-tracker/shared";
 import { DataGrid } from "./components/DataGrid";
 import { SparklineBars } from "./components/SparklineBars";
 import { StatusBadge } from "./components/StatusBadge";
-import { fetchSnapshot, runTrackingJob } from "./lib/api";
+import { createTrackingJob, fetchSnapshot, runTrackingJob, updateTrackingJob } from "./lib/api";
 
 type ViewKey = "dashboard" | "accounts" | "products" | "experiments" | "tracking" | "results";
 
@@ -22,6 +25,15 @@ const navItems: Array<{ key: ViewKey; label: string }> = [
   { key: "tracking", label: "추적 작업" },
   { key: "results", label: "랭킹 결과" }
 ];
+
+const defaultTrackingJobForm: RankTrackingJobFormInput = {
+  experimentId: "",
+  productId: "",
+  keyword: "",
+  interval: "30_MINUTES",
+  provider: "MOCK",
+  isEnabled: true
+};
 
 export function App() {
   const [view, setView] = useState<ViewKey>("dashboard");
@@ -47,6 +59,16 @@ export function App() {
 
   async function handleRunJob(jobId: string) {
     await runTrackingJob(jobId);
+    await loadSnapshot();
+  }
+
+  async function handleCreateTrackingJob(input: RankTrackingJobFormInput) {
+    await createTrackingJob(input);
+    await loadSnapshot();
+  }
+
+  async function handleToggleTrackingJob(job: RankTrackingJob) {
+    await updateTrackingJob(job.id, { isEnabled: !job.isEnabled });
     await loadSnapshot();
   }
 
@@ -83,8 +105,17 @@ export function App() {
             {view === "accounts" && <ApiAccountsView accounts={snapshot.apiAccounts} />}
             {view === "products" && <ProductsView products={snapshot.products} />}
             {view === "experiments" && <ExperimentsView experiments={snapshot.experiments} />}
-            {view === "tracking" && <TrackingJobsView jobs={snapshot.jobs} onRunJob={handleRunJob} />}
-            {view === "results" && <ResultsView results={snapshot.results} />}
+            {view === "tracking" && (
+              <TrackingJobsView
+                jobs={snapshot.jobs}
+                experiments={snapshot.experiments}
+                products={snapshot.products}
+                onCreateJob={handleCreateTrackingJob}
+                onRunJob={handleRunJob}
+                onToggleJob={handleToggleTrackingJob}
+              />
+            )}
+            {view === "results" && <ResultsView results={snapshot.results} products={snapshot.products} />}
           </>
         )}
       </main>
@@ -229,11 +260,39 @@ function ExperimentsView({ experiments }: { experiments: SeoExperiment[] }) {
 
 function TrackingJobsView({
   jobs,
-  onRunJob
+  experiments,
+  products,
+  onCreateJob,
+  onRunJob,
+  onToggleJob
 }: {
   jobs: RankTrackingJob[];
+  experiments: SeoExperiment[];
+  products: Product[];
+  onCreateJob: (input: RankTrackingJobFormInput) => Promise<void>;
   onRunJob: (jobId: string) => Promise<void>;
+  onToggleJob: (job: RankTrackingJob) => Promise<void>;
 }) {
+  const [form, setForm] = useState<RankTrackingJobFormInput>(defaultTrackingJobForm);
+
+  useEffect(() => {
+    setForm((current) => ({
+      ...current,
+      experimentId: current.experimentId || experiments[0]?.id || "",
+      productId: current.productId || products[0]?.id || ""
+    }));
+  }, [experiments, products]);
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await onCreateJob(form);
+    setForm({
+      ...defaultTrackingJobForm,
+      experimentId: experiments[0]?.id || "",
+      productId: products[0]?.id || ""
+    });
+  }
+
   return (
     <section className="panel">
       <div className="section-heading">
@@ -242,11 +301,105 @@ function TrackingJobsView({
           <h2>랭킹 추적 Job</h2>
         </div>
       </div>
+      <form className="entity-form" onSubmit={handleSubmit}>
+        <label>
+          <span>실험 선택</span>
+          <select
+            value={form.experimentId}
+            onChange={(event) => setForm((current) => ({ ...current, experimentId: event.target.value }))}
+          >
+            <option value="">실험 선택</option>
+            {experiments.map((experiment) => (
+              <option key={experiment.id} value={experiment.id}>
+                {experiment.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          <span>상품 선택</span>
+          <select
+            value={form.productId}
+            onChange={(event) => setForm((current) => ({ ...current, productId: event.target.value }))}
+          >
+            <option value="">상품 선택</option>
+            {products.map((product) => (
+              <option key={product.id} value={product.id}>
+                {product.currentTitle}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          <span>추적 키워드</span>
+          <input
+            value={form.keyword}
+            onChange={(event) => setForm((current) => ({ ...current, keyword: event.target.value }))}
+            placeholder="예: 네이버 상품명 최적화"
+          />
+        </label>
+        <label>
+          <span>주기</span>
+          <select
+            value={form.interval}
+            onChange={(event) =>
+              setForm((current) => ({ ...current, interval: event.target.value as TrackingInterval }))
+            }
+          >
+            <option value="30_MINUTES">30분</option>
+            <option value="60_MINUTES">60분</option>
+          </select>
+        </label>
+        <label>
+          <span>Provider</span>
+          <select
+            value={form.provider}
+            onChange={(event) =>
+              setForm((current) => ({ ...current, provider: event.target.value as RankProviderKind }))
+            }
+          >
+            <option value="MOCK">MOCK</option>
+            <option value="NAVER_SHOPPING">NAVER_SHOPPING</option>
+            <option value="FUTURE_API">FUTURE_API</option>
+          </select>
+        </label>
+        <label className="checkbox-field">
+          <span>활성화</span>
+          <input
+            type="checkbox"
+            checked={form.isEnabled}
+            onChange={(event) => setForm((current) => ({ ...current, isEnabled: event.target.checked }))}
+          />
+        </label>
+        <div className="inline-actions wide-field">
+          <button type="submit" className="action-button">
+            Job 등록
+          </button>
+        </div>
+      </form>
       <DataGrid
         columns={[
           { key: "keyword", title: "키워드", width: 180, sticky: true },
+          {
+            key: "experimentId",
+            title: "실험",
+            width: 220,
+            render: (row) => experiments.find((experiment) => experiment.id === row.experimentId)?.name ?? row.experimentId
+          },
+          {
+            key: "productId",
+            title: "상품",
+            width: 260,
+            render: (row) => products.find((product) => product.id === row.productId)?.currentTitle ?? row.productId
+          },
           { key: "provider", title: "Provider", width: 140 },
           { key: "interval", title: "주기", width: 120 },
+          {
+            key: "isEnabled",
+            title: "활성",
+            width: 100,
+            render: (row) => <StatusBadge value={row.isEnabled ? "CONNECTED" : "PAUSED"} />
+          },
           {
             key: "status",
             title: "상태",
@@ -257,11 +410,16 @@ function TrackingJobsView({
           {
             key: "actions",
             title: "실행",
-            width: 120,
+            width: 220,
             render: (row) => (
-              <button type="button" className="action-button" onClick={() => void onRunJob(row.id)}>
-                즉시 추적
-              </button>
+              <div className="inline-actions compact-actions">
+                <button type="button" className="action-button" onClick={() => void onRunJob(row.id)}>
+                  즉시 추적
+                </button>
+                <button type="button" className="action-button secondary" onClick={() => void onToggleJob(row)}>
+                  {row.isEnabled ? "비활성" : "활성"}
+                </button>
+              </div>
             )
           }
         ]}
@@ -271,7 +429,7 @@ function TrackingJobsView({
   );
 }
 
-function ResultsView({ results }: { results: RankTrackingResult[] }) {
+function ResultsView({ results, products }: { results: RankTrackingResult[]; products: Product[] }) {
   return (
     <section className="panel">
       <div className="section-heading">
@@ -283,6 +441,12 @@ function ResultsView({ results }: { results: RankTrackingResult[] }) {
       <DataGrid
         columns={[
           { key: "keyword", title: "키워드", width: 180, sticky: true },
+          {
+            key: "productId",
+            title: "상품",
+            width: 260,
+            render: (row) => products.find((product) => product.id === row.productId)?.currentTitle ?? row.productId
+          },
           { key: "trackedAt", title: "추적 시각", width: 180 },
           { key: "currentRank", title: "현재 순위", width: 120 },
           { key: "previousRank", title: "이전 순위", width: 120 },

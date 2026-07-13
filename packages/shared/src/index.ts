@@ -1,4 +1,4 @@
-export type ApiAccountType = "COMMERCE" | "SEARCH_AD" | "CUSTOM";
+﻿export type ApiAccountType = "COMMERCE" | "SEARCH_AD" | "CUSTOM";
 export type ConnectionStatus = "CONNECTED" | "FAILED" | "UNVERIFIED" | "EXPIRED";
 export type ProductStatus = "ON_SALE" | "PAUSED" | "SOLD_OUT";
 export type TestStatus = "DRAFT" | "RUNNING" | "PAUSED" | "COMPLETED" | "FAILED";
@@ -81,6 +81,15 @@ export interface RankTrackingJob {
   retryCount: number;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface RankTrackingJobFormInput {
+  experimentId: string;
+  productId: string;
+  keyword: string;
+  interval: TrackingInterval;
+  provider: RankProviderKind;
+  isEnabled: boolean;
 }
 
 export interface RankTrackingResult {

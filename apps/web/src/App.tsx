@@ -247,7 +247,7 @@ function ApiAccountsView({
     try {
       await onCreateAccount(form);
       setForm(defaultApiAccountForm);
-      setFeedback("API 계정을 저장했습니다.");
+      setFeedback("API account saved.");
     } finally {
       setSubmitting(false);
     }
@@ -265,8 +265,8 @@ function ApiAccountsView({
     <section className="panel">
       <div className="section-heading">
         <div>
-          <p className="eyebrow">연결 상태</p>
-          <h2>네이버 API 계정</h2>
+          <p className="eyebrow">Connection Status</p>
+          <h2>Naver API Accounts</h2>
           <p className="helper-copy">SEARCH_AD runs a live external API test. COMMERCE and CUSTOM currently run validation-only checks.</p>
           <div className="type-guide-card">
             <strong>{accountGuide.modeLabel}</strong>
@@ -283,56 +283,39 @@ function ApiAccountsView({
       </div>
       <form className="account-form" onSubmit={handleSubmit}>
         <label>
-          <span>계정명</span>
+          <span>Account Name</span>
           <input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} required />
         </label>
         <label>
-          <span>유형</span>
+          <span>Type</span>
           <select
             value={form.type}
             onChange={(event) => setForm({ ...form, type: event.target.value as ApiAccountFormInput["type"] })}
           >
-            <option value="COMMERCE">네이버 커머스API</option>
-            <option value="SEARCH_AD">네이버 검색광고API</option>
-            <option value="CUSTOM">기타 확장용</option>
+            <option value="COMMERCE">Naver Commerce API</option>
+            <option value="SEARCH_AD">Naver SearchAd API</option>
+            <option value="CUSTOM">Custom / Future Adapter</option>
           </select>
         </label>
         <label>
           <span>Client ID</span>
-          <input
-            value={form.clientId}
-            onChange={(event) => setForm({ ...form, clientId: event.target.value })}
-            required
-          />
+          <input value={form.clientId} onChange={(event) => setForm({ ...form, clientId: event.target.value })} required />
         </label>
         <label>
           <span>Client Secret</span>
-          <input
-            value={form.clientSecret}
-            onChange={(event) => setForm({ ...form, clientSecret: event.target.value })}
-            required
-          />
+          <input value={form.clientSecret} onChange={(event) => setForm({ ...form, clientSecret: event.target.value })} required />
         </label>
         <label>
           <span>Access License</span>
-          <input
-            value={form.accessLicense ?? ""}
-            onChange={(event) => setForm({ ...form, accessLicense: event.target.value })}
-          />
+          <input value={form.accessLicense ?? ""} onChange={(event) => setForm({ ...form, accessLicense: event.target.value })} />
         </label>
         <label>
           <span>Secret Key</span>
-          <input
-            value={form.secretKey ?? ""}
-            onChange={(event) => setForm({ ...form, secretKey: event.target.value })}
-          />
+          <input value={form.secretKey ?? ""} onChange={(event) => setForm({ ...form, secretKey: event.target.value })} />
         </label>
         <label>
           <span>Customer ID</span>
-          <input
-            value={form.customerId ?? ""}
-            onChange={(event) => setForm({ ...form, customerId: event.target.value })}
-          />
+          <input value={form.customerId ?? ""} onChange={(event) => setForm({ ...form, customerId: event.target.value })} />
         </label>
         <label>
           <span>Store ID</span>
@@ -340,61 +323,54 @@ function ApiAccountsView({
         </label>
         <label>
           <span>Channel ID</span>
-          <input
-            value={form.channelId ?? ""}
-            onChange={(event) => setForm({ ...form, channelId: event.target.value })}
-          />
+          <input value={form.channelId ?? ""} onChange={(event) => setForm({ ...form, channelId: event.target.value })} />
         </label>
         <label className="checkbox-field">
-          <input
-            type="checkbox"
-            checked={form.isActive}
-            onChange={(event) => setForm({ ...form, isActive: event.target.checked })}
-          />
-          <span>사용 여부</span>
+          <input type="checkbox" checked={form.isActive} onChange={(event) => setForm({ ...form, isActive: event.target.checked })} />
+          <span>Active</span>
         </label>
         <button type="submit" className="action-button" disabled={submitting}>
-          {submitting ? "저장 중..." : "계정 등록"}
+          {submitting ? "Saving..." : "Save Account"}
         </button>
       </form>
       {feedback && <div className="feedback-banner">{feedback}</div>}
       <DataGrid
         columns={[
-          { key: "name", title: "계정명", width: 180, sticky: true },
-          { key: "type", title: "유형", width: 120 },
+          { key: "name", title: "Account", width: 180, sticky: true },
+          { key: "type", title: "Type", width: 120 },
           { key: "clientIdMasked", title: "Client ID", width: 160 },
           { key: "clientSecretMasked", title: "Client Secret", width: 180 },
           { key: "storeId", title: "Store ID", width: 140 },
           { key: "channelId", title: "Channel ID", width: 140 },
           {
             key: "lastTestSummary",
-            title: "최근 테스트",
+            title: "Latest Test",
             width: 260,
             render: (row) => row.lastTestSummary ?? "-"
           },
           {
             key: "connectionStatus",
-            title: "상태",
+            title: "Status",
             width: 120,
             render: (row) => <StatusBadge value={row.connectionStatus} />
           },
           {
             key: "isActive",
-            title: "사용",
+            title: "Active",
             width: 100,
             render: (row) => <StatusBadge value={row.isActive ? "CONNECTED" : "PAUSED"} />
           },
           {
             key: "actions",
-            title: "작업",
+            title: "Actions",
             width: 240,
             render: (row) => (
               <div className="inline-actions">
                 <button type="button" className="action-button secondary" onClick={() => void handleTest(row.id)}>
-                  연결 테스트
+                  Test Connection
                 </button>
                 <button type="button" className="action-button secondary" onClick={() => void onToggleAccount(row)}>
-                  {row.isActive ? "비활성화" : "활성화"}
+                  {row.isActive ? "Deactivate" : "Activate"}
                 </button>
               </div>
             )
@@ -406,29 +382,36 @@ function ApiAccountsView({
         <div className="section-heading">
           <div>
             <p className="eyebrow">Test History</p>
-            <h3>최근 API 계정 테스트 로그</h3>
+            <h3>Recent API Account Test Logs</h3>
           </div>
         </div>
-        <DataGrid
-          columns={[
-            {
-              key: "createdAt",
-              title: "시각",
-              width: 180,
-              sticky: true,
-              render: (row) => formatDateTime(row.createdAt)
-            },
-            { key: "level", title: "Level", width: 100, render: (row) => <StatusBadge value={row.level} /> },
-            { key: "message", title: "메시지", width: 420 },
-            {
-              key: "metaJson",
-              title: "상세",
-              width: 360,
-              render: (row) => row.metaJson ?? "-"
-            }
-          ]}
-          rows={recentAccountTestLogs}
-        />
+        {recentAccountTestLogs.length === 0 ? (
+          <div className="empty-state-card">
+            <strong>No account test logs yet.</strong>
+            <p>Run a connection test to populate the latest API account history.</p>
+          </div>
+        ) : (
+          <DataGrid
+            columns={[
+              {
+                key: "createdAt",
+                title: "Time",
+                width: 180,
+                sticky: true,
+                render: (row) => formatDateTime(row.createdAt)
+              },
+              { key: "level", title: "Level", width: 100, render: (row) => <StatusBadge value={row.level} /> },
+              { key: "message", title: "Message", width: 420 },
+              {
+                key: "detailSummary",
+                title: "Details",
+                width: 360,
+                render: (row) => row.detailSummary
+              }
+            ]}
+            rows={recentAccountTestLogs}
+          />
+        )}
       </div>
     </section>
   );

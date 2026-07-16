@@ -511,6 +511,7 @@ select {
   background: linear-gradient(180deg, rgba(245, 248, 255, 0.98), rgba(238, 243, 255, 0.98));
 }
 
+.form-checklist-card,
 .form-readiness-card {
   display: grid;
   gap: 12px;
@@ -521,12 +522,19 @@ select {
 }
 
 .form-readiness-card p,
-.form-readiness-card small {
+.form-readiness-card small,
+.form-checklist-card p {
   margin: 0;
 }
 
-.form-readiness-card small {
+.form-readiness-card small,
+.form-checklist-card p {
   color: var(--text-soft);
+}
+
+.checklist-success {
+  color: #05cd99 !important;
+  font-weight: 700;
 }
 
 .grid-shell {

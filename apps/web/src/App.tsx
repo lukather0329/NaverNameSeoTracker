@@ -283,6 +283,7 @@ function ApiAccountsView({
   const readinessSummary = buildAccountReadinessSummary(accounts, recentAccountTestLogs.length);
   const formReadiness = buildFormReadinessPreview(form);
   const canSaveAccount = formReadiness.state !== "INCOMPLETE";
+  const currentRequiredFields = getCurrentRequiredFields(form.type);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -349,6 +350,32 @@ function ApiAccountsView({
             ))}
           </div>
         </div>
+      </div>
+      <div className="form-checklist-card">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">Form Checklist</p>
+            <h3>Required Right Now</h3>
+          </div>
+        </div>
+        <div className="guide-chip-row">
+          {currentRequiredFields.map((field) => (
+            <span key={field} className="guide-chip">
+              {field}
+            </span>
+          ))}
+        </div>
+        {formReadiness.missingFields.length > 0 ? (
+          <div className="guide-chip-row">
+            {formReadiness.missingFields.map((field) => (
+              <span key={field} className="guide-chip muted">
+                Missing: {field}
+              </span>
+            ))}
+          </div>
+        ) : (
+          <p className="checklist-success">All required fields for the current flow are filled.</p>
+        )}
       </div>
       <form className="account-form" onSubmit={handleSubmit}>
         <label>
@@ -977,6 +1004,18 @@ function downloadCsv(fileName: string, csvText: string) {
   anchor.download = fileName;
   anchor.click();
   URL.revokeObjectURL(url);
+}
+
+function getCurrentRequiredFields(type: ApiAccountFormInput["type"]) {
+  if (type === "SEARCH_AD") {
+    return ["Account Name", "Client ID", "Client Secret", "Access License", "Secret Key", "Customer ID"];
+  }
+
+  if (type === "COMMERCE") {
+    return ["Account Name", "Client ID", "Client Secret", "Access License", "Secret Key", "Store ID or Channel ID"];
+  }
+
+  return ["Account Name", "Client ID", "Client Secret"];
 }
 
 function buildFormReadinessPreview(input: ApiAccountFormInput): FormReadinessPreview {

@@ -1,4 +1,4 @@
-﻿# Company PC Handoff
+# Company PC Handoff
 
 Last updated: 2026-07-16
 Current repo: `D:\Codex\NaverNameSeoTracker`
@@ -25,7 +25,8 @@ Current focus branch: `feature/reports`
   - workspace build verified on 2026-07-16 with `npm run build`
   - local API health and snapshot verified after dotenv/prisma bootstrap fix on 2026-07-16
   - sample seed data restored and snapshot data verified on 2026-07-16
-  - API account save and validation-test flow verified on 2026-07-16
+  - API account save flow verified on 2026-07-16
+- SEARCH_AD live connection test added on 2026-07-16 (COMMERCE/CUSTOM remain validation-only)
 
 ## 2. First steps on company PC
 
@@ -45,7 +46,8 @@ git pull origin feature/reports
 - CSV export for ranking results
 - API account registration form
 - API account active toggle
-- API account connection validation test endpoint and UI
+- API account connection test endpoint and UI
+- SEARCH_AD real external-call test via Naver SearchAd `/ncc/campaigns`
 - shared/package/server/web TypeScript build blockers fixed
 - Vite env typing and workspace build scripts aligned
 - server dotenv load order fixed so Prisma reads `DATABASE_URL` during runtime
@@ -55,7 +57,7 @@ git pull origin feature/reports
 
 1. Verify `feature/reports` UI rendering in browser.
 2. Test both CSV downloads with seeded snapshot data.
-3. Replace API account validation test with real external-call adapter.
+3. Extend real external-call adapter to COMMERCE accounts.
 4. Add filters or date range controls to report view.
 5. Merge validated feature branches into `dev`.
 
@@ -90,7 +92,7 @@ npm run dev
 
 ## 7. Likely next improvements after this branch
 
-- add a real Naver external-call test adapter for saved API accounts
+- add a real Naver COMMERCE external-call test adapter for saved API accounts
 - add report date range filter
 - add experiment/product filters
 - move CSV generation to server endpoint if file volume grows

@@ -1,6 +1,13 @@
-﻿import type { ApiAccountFormInput, AppSnapshot } from "@naver-seo-tracker/shared";
+import type { ApiAccountFormInput, AppSnapshot } from "@naver-seo-tracker/shared";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:4300/api";
+export type ApiConnectionTestResponse = {
+  ok: boolean;
+  message: string;
+  mode?: string;
+  statusCode?: number;
+  details?: string;
+};
 
 export async function fetchSnapshot(): Promise<AppSnapshot> {
   const response = await fetch(`${API_BASE_URL}/snapshot`);
@@ -56,7 +63,7 @@ export async function updateApiAccount(accountId: string, input: Partial<ApiAcco
   return response.json();
 }
 
-export async function testApiAccountConnection(accountId: string) {
+export async function testApiAccountConnection(accountId: string): Promise<ApiConnectionTestResponse> {
   const response = await fetch(`${API_BASE_URL}/accounts/${accountId}/test`, {
     method: "POST"
   });

@@ -1,10 +1,10 @@
-﻿import { Router } from "express";
+import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
 import { maskSecret } from "../lib/mask.js";
 import { getDashboardSummary } from "../services/dashboard-service.js";
+import { testNaverApiConnection } from "../services/naver-api-test-service.js";
 import { runTrackingJob } from "../services/rank-tracking-service.js";
-
 const router = Router();
 
 const apiAccountSchema = z.object({
@@ -140,13 +140,8 @@ router.post("/accounts/:id/test", async (req, res) => {
     return;
   }
 
-  const hasBaseCredentials = Boolean(account.clientId && account.clientSecret);
-  const hasExtendedCredentials =
-    account.type !== "COMMERCE" ||
-    Boolean(account.accessLicense && account.secretKey && (account.storeId || account.channelId));
-
-  const isConnected = hasBaseCredentials && hasExtendedCredentials;
-  const connectionStatus = isConnected ? "CONNECTED" : "FAILED";
+  const result = await testNaverApiConnection(account);
+  const connectionStatus = result.ok ? "CONNECTED" : "FAILED";
 
   const updated = await prisma.apiAccount.update({
     where: { id: account.id },
@@ -157,11 +152,11 @@ router.post("/accounts/:id/test", async (req, res) => {
   });
 
   res.json({
-    ok: isConnected,
-    mode: "validation",
-    message: isConnected
-      ? "필수 인증 항목 검증을 통과했습니다. 실외부호출 테스트는 후속 어댑터 연결이 필요합니다."
-      : "필수 인증 정보가 부족해 연결 테스트에 실패했습니다.",
+    ok: result.ok,
+    mode: result.mode,
+    statusCode: result.statusCode,
+    details: result.details,
+    message: result.message,
     account: updated
   });
 });

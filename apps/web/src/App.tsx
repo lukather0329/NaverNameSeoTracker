@@ -1,4 +1,4 @@
-﻿import type { FormEvent } from "react";
+import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
 import type {
   ApiAccount,
@@ -196,7 +196,7 @@ function ApiAccountsView({
 }: {
   accounts: ApiAccount[];
   onCreateAccount: (input: ApiAccountFormInput) => Promise<void>;
-  onTestAccount: (accountId: string) => Promise<{ ok: boolean; message: string; mode?: string }>;
+  onTestAccount: (accountId: string) => Promise<{ ok: boolean; message: string; mode?: string; statusCode?: number; details?: string }>;
   onToggleAccount: (account: ApiAccount) => Promise<void>;
 }) {
   const [form, setForm] = useState<ApiAccountFormInput>(defaultApiAccountForm);
@@ -219,7 +219,10 @@ function ApiAccountsView({
 
   async function handleTest(accountId: string) {
     const result = await onTestAccount(accountId);
-    setFeedback(result.message);
+    const suffix = [result.mode ? `mode=${result.mode}` : "", result.statusCode ? `status=${result.statusCode}` : "", result.details ?? ""]
+      .filter(Boolean)
+      .join(" | ");
+    setFeedback(suffix ? `${result.message} (${suffix})` : result.message);
   }
 
   return (
@@ -228,7 +231,7 @@ function ApiAccountsView({
         <div>
           <p className="eyebrow">연결 상태</p>
           <h2>네이버 API 계정</h2>
-          <p className="helper-copy">지금 테스트는 필수 인증 항목 검증 기준입니다. 실외부호출 어댑터는 다음 단계에서 연결합니다.</p>
+          <p className="helper-copy">SEARCH_AD runs a live external API test. COMMERCE and CUSTOM currently run validation-only checks.</p>
         </div>
       </div>
       <form className="account-form" onSubmit={handleSubmit}>

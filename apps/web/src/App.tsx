@@ -43,6 +43,11 @@ type NextActionGuide = {
   title: string;
   description: string;
 };
+type FeedbackTone = "success" | "warning" | "error" | "info";
+type FeedbackState = {
+  tone: FeedbackTone;
+  message: string;
+};
 type FieldHint = {
   placeholder: string;
   helper: string;
@@ -289,7 +294,7 @@ function ApiAccountsView({
 }) {
   const [form, setForm] = useState<ApiAccountFormInput>(defaultApiAccountForm);
   const [submitting, setSubmitting] = useState(false);
-  const [feedback, setFeedback] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<FeedbackState | null>(null);
   const accountGuide = accountTypeGuides[form.type];
   const saveTimingGuide = accountSaveTimingGuides[form.type];
   const recentAccountTestLogs: AccountTestLogViewRow[] = (systemLogs ?? [])
@@ -315,7 +320,10 @@ function ApiAccountsView({
     setFeedback(null);
 
     if (!canSaveAccount) {
-      setFeedback(`Complete the required fields first: ${formReadiness.missingFields.join(", ")}`);
+      setFeedback({
+        tone: "warning",
+        message: `Complete the required fields first: ${formReadiness.missingFields.join(", ")}`
+      });
       return;
     }
 
@@ -324,7 +332,10 @@ function ApiAccountsView({
     try {
       await onCreateAccount(form);
       setForm(defaultApiAccountForm);
-      setFeedback("API account saved.");
+      setFeedback({
+        tone: "success",
+        message: "API account saved."
+      });
     } finally {
       setSubmitting(false);
     }
@@ -335,7 +346,9 @@ function ApiAccountsView({
     const suffix = [result.mode ? `mode=${result.mode}` : "", result.statusCode ? `status=${result.statusCode}` : "", result.details ?? ""]
       .filter(Boolean)
       .join(" | ");
-    setFeedback(suffix ? `${result.message} (${suffix})` : result.message);
+    const message = suffix ? `${result.message} (${suffix})` : result.message;
+    const tone = result.ok ? (result.mode === "real" ? "success" : "info") : "error";
+    setFeedback({ tone, message });
   }
 
   return (
@@ -502,7 +515,7 @@ function ApiAccountsView({
           </div>
         )}
       </div>
-      {feedback && <div className="feedback-banner">{feedback}</div>}
+      {feedback && <div className={`feedback-banner ${feedback.tone}`}>{feedback.message}</div>}
       <DataGrid
         columns={[
           { key: "name", title: "Account", width: 180, sticky: true },

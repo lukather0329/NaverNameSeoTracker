@@ -551,6 +551,30 @@ select {
   background: linear-gradient(180deg, rgba(245, 248, 255, 0.98), rgba(238, 243, 255, 0.98));
 }
 
+.feedback-banner.success {
+  border-color: rgba(5, 205, 153, 0.22);
+  color: #046c52;
+  background: linear-gradient(180deg, rgba(238, 255, 249, 0.98), rgba(226, 250, 242, 0.98));
+}
+
+.feedback-banner.warning {
+  border-color: rgba(255, 181, 71, 0.28);
+  color: #8a5300;
+  background: linear-gradient(180deg, rgba(255, 248, 232, 0.98), rgba(255, 240, 208, 0.98));
+}
+
+.feedback-banner.error {
+  border-color: rgba(238, 93, 80, 0.24);
+  color: #8f231b;
+  background: linear-gradient(180deg, rgba(255, 241, 240, 0.98), rgba(255, 229, 227, 0.98));
+}
+
+.feedback-banner.info {
+  border-color: rgba(67, 24, 255, 0.18);
+  color: #2f166f;
+  background: linear-gradient(180deg, rgba(245, 248, 255, 0.98), rgba(233, 240, 255, 0.98));
+}
+
 .next-action-card,
 .form-checklist-card,
 .form-readiness-card {

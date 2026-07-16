@@ -587,35 +587,100 @@ function ResultsView({ results, products }: { results: RankTrackingResult[]; pro
 
 function ReportsView({ snapshot }: { snapshot: AppSnapshot }) {
   const experimentRows = buildExperimentReportRows(snapshot.experiments, snapshot.products, snapshot.results);
-  const summaryCards = buildReportSummary(snapshot, experimentRows);
+  const [statusFilter, setStatusFilter] = useState<string>("ALL");
+  const [judgementFilter, setJudgementFilter] = useState<string>("ALL");
+  const [windowFilter, setWindowFilter] = useState<string>("ALL");
+
+  const filteredRows = experimentRows.filter((row) => {
+    const statusMatch = statusFilter === "ALL" || row.status === statusFilter;
+    const judgementMatch = judgementFilter === "ALL" || row.judgement === judgementFilter;
+    const windowMatch = matchesTrackedWindow(row.trackedAtValue, windowFilter);
+    return statusMatch && judgementMatch && windowMatch;
+  });
+  const filteredExperimentIds = new Set(filteredRows.map((row) => row.id));
+  const filteredResults = snapshot.results.filter((row) => filteredExperimentIds.has(row.experimentId));
+  const summaryCards = buildReportSummary(snapshot, filteredRows);
+
+  function resetFilters() {
+    setStatusFilter("ALL");
+    setJudgementFilter("ALL");
+    setWindowFilter("ALL");
+  }
 
   return (
     <section className="dashboard report-layout">
       <div className="panel report-hero">
         <div>
-          <p className="eyebrow">주간/월간 공유용</p>
-          <h2>리포트 요약과 내보내기</h2>
+          <p className="eyebrow">Weekly / Monthly Share</p>
+          <h2>Report Summary and Export</h2>
           <p>
-            실험 성과를 한 번에 요약하고, 운영 회의나 외부 공유용 CSV를 바로 내려받을 수 있도록 구성했습니다.
+            Summarize experiment performance in one place and export filtered report rows for team reviews,
+            handoff notes, or weekly reporting.
           </p>
         </div>
         <div className="inline-actions">
           <button
             type="button"
             className="action-button"
-            onClick={() => downloadCsv("experiment-report.csv", buildExperimentCsv(experimentRows))}
+            onClick={() => downloadCsv("experiment-report.csv", buildExperimentCsv(filteredRows))}
           >
-            실험 리포트 CSV
+            Experiment CSV
           </button>
           <button
             type="button"
             className="action-button"
-            onClick={() => downloadCsv("rank-results.csv", buildResultsCsv(snapshot.results, snapshot.products))}
+            onClick={() => downloadCsv("rank-results.csv", buildResultsCsv(filteredResults, snapshot.products))}
           >
-            랭킹 결과 CSV
+            Rank Result CSV
           </button>
         </div>
       </div>
+      <section className="panel report-filter-panel">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">Report Filters</p>
+            <h3>Filter Report Rows</h3>
+          </div>
+          <div className="inline-actions">
+            <span className="filter-summary">{filteredRows.length} experiments</span>
+            <button type="button" className="action-button secondary" onClick={resetFilters}>
+              Reset Filters
+            </button>
+          </div>
+        </div>
+        <div className="report-filters">
+          <label>
+            <span>Status</span>
+            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+              <option value="ALL">All</option>
+              <option value="DRAFT">DRAFT</option>
+              <option value="RUNNING">RUNNING</option>
+              <option value="PAUSED">PAUSED</option>
+              <option value="COMPLETED">COMPLETED</option>
+              <option value="FAILED">FAILED</option>
+            </select>
+          </label>
+          <label>
+            <span>Judgement</span>
+            <select value={judgementFilter} onChange={(event) => setJudgementFilter(event.target.value)}>
+              <option value="ALL">All</option>
+              <option value="EFFECTIVE">EFFECTIVE</option>
+              <option value="LOW_EFFECT">LOW_EFFECT</option>
+              <option value="PENDING">PENDING</option>
+              <option value="WORSE">WORSE</option>
+            </select>
+          </label>
+          <label>
+            <span>Tracked Window</span>
+            <select value={windowFilter} onChange={(event) => setWindowFilter(event.target.value)}>
+              <option value="ALL">All</option>
+              <option value="7D">Last 7 days</option>
+              <option value="30D">Last 30 days</option>
+              <option value="90D">Last 90 days</option>
+            </select>
+          </label>
+        </div>
+      </section>
       <div className="card-grid">
         {summaryCards.map((card) => (
           <article key={card.label} className="metric-card panel tone-card">
@@ -628,40 +693,46 @@ function ReportsView({ snapshot }: { snapshot: AppSnapshot }) {
       <section className="panel">
         <div className="section-heading">
           <div>
-            <p className="eyebrow">성과 요약</p>
-            <h2>실험별 리포트</h2>
+            <p className="eyebrow">Performance Overview</p>
+            <h2>Experiment Report Table</h2>
           </div>
         </div>
-        <DataGrid
-          columns={[
-            { key: "name", title: "실험명", width: 220, sticky: true },
-            { key: "productTitle", title: "상품", width: 260 },
-            {
-              key: "status",
-              title: "상태",
-              width: 120,
-              render: (row) => <StatusBadge value={row.status} />
-            },
-            {
-              key: "judgement",
-              title: "판단",
-              width: 120,
-              render: (row) => <StatusBadge value={row.judgement} />
-            },
-            { key: "trackingInterval", title: "주기", width: 120 },
-            { key: "keywordCount", title: "키워드 수", width: 110 },
-            { key: "latestRank", title: "최신 순위", width: 110 },
-            { key: "avgDelta", title: "평균 변화량", width: 120 },
-            { key: "upRate", title: "상승 비율", width: 120 },
-            { key: "trackedAt", title: "마지막 추적", width: 180 }
-          ]}
-          rows={experimentRows}
-        />
+        {filteredRows.length === 0 ? (
+          <div className="empty-state-card">
+            <strong>No report rows match the current filters.</strong>
+            <p>Reset the filters or widen the tracked window to bring rows back into view.</p>
+          </div>
+        ) : (
+          <DataGrid
+            columns={[
+              { key: "name", title: "Experiment", width: 220, sticky: true },
+              { key: "productTitle", title: "Product", width: 260 },
+              {
+                key: "status",
+                title: "Status",
+                width: 120,
+                render: (row) => <StatusBadge value={row.status} />
+              },
+              {
+                key: "judgement",
+                title: "Judgement",
+                width: 120,
+                render: (row) => <StatusBadge value={row.judgement} />
+              },
+              { key: "trackingInterval", title: "Interval", width: 120 },
+              { key: "keywordCount", title: "Keywords", width: 110 },
+              { key: "latestRank", title: "Latest Rank", width: 110 },
+              { key: "avgDelta", title: "Avg Delta", width: 120 },
+              { key: "upRate", title: "Up Rate", width: 120 },
+              { key: "trackedAt", title: "Last Tracked", width: 180 }
+            ]}
+            rows={filteredRows}
+          />
+        )}
       </section>
     </section>
   );
 }
-
 function buildExperimentReportRows(
   experiments: SeoExperiment[],
   products: Product[],

@@ -32,6 +32,12 @@ type AccountReadinessSummary = {
   caption: string;
 };
 type AccountReadinessState = "LIVE_READY" | "VALIDATION_READY" | "INCOMPLETE";
+type FormReadinessPreview = {
+  state: AccountReadinessState;
+  title: string;
+  caption: string;
+  missingFields: string[];
+};
 type ExperimentReportRow = {
   id: string;
   name: string;
@@ -275,6 +281,7 @@ function ApiAccountsView({
       detailSummary: formatApiAccountTestMeta(row.metaJson)
     }));
   const readinessSummary = buildAccountReadinessSummary(accounts, recentAccountTestLogs.length);
+  const formReadiness = buildFormReadinessPreview(form);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -388,6 +395,26 @@ function ApiAccountsView({
           {submitting ? "Saving..." : "Save Account"}
         </button>
       </form>
+      <div className="form-readiness-card">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">Form Preview</p>
+            <h3>Current Test Readiness</h3>
+          </div>
+          <StatusBadge value={formReadiness.state} />
+        </div>
+        <p>{formReadiness.title}</p>
+        <small>{formReadiness.caption}</small>
+        {formReadiness.missingFields.length > 0 && (
+          <div className="guide-chip-row">
+            {formReadiness.missingFields.map((field) => (
+              <span key={field} className="guide-chip muted">
+                {field}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
       {feedback && <div className="feedback-banner">{feedback}</div>}
       <DataGrid
         columns={[
@@ -938,6 +965,77 @@ function downloadCsv(fileName: string, csvText: string) {
   anchor.download = fileName;
   anchor.click();
   URL.revokeObjectURL(url);
+}
+
+function buildFormReadinessPreview(input: ApiAccountFormInput): FormReadinessPreview {
+  const missingFields = getFormMissingFields(input);
+
+  if (input.type === "SEARCH_AD" && missingFields.length === 0) {
+    return {
+      state: "LIVE_READY",
+      title: "This account can be saved and tested with a real SearchAd connection right away.",
+      caption: "All required SearchAd fields are present.",
+      missingFields
+    };
+  }
+
+  if (input.type !== "SEARCH_AD" && missingFields.length === 0) {
+    return {
+      state: "VALIDATION_READY",
+      title: "This account is ready for the current validation flow.",
+      caption: input.type === "COMMERCE" ? "Live commerce calls are still a follow-up task." : "Custom accounts currently use basic validation only.",
+      missingFields
+    };
+  }
+
+  return {
+    state: "INCOMPLETE",
+    title: "More fields are needed before this account can be tested.",
+    caption: `Missing ${missingFields.length} required field${missingFields.length === 1 ? "" : "s"}.`,
+    missingFields
+  };
+}
+
+function getFormMissingFields(input: ApiAccountFormInput) {
+  const missingFields: string[] = [];
+
+  if (!input.name.trim()) {
+    missingFields.push("Account Name");
+  }
+
+  if (!input.clientId.trim()) {
+    missingFields.push("Client ID");
+  }
+
+  if (!input.clientSecret.trim()) {
+    missingFields.push("Client Secret");
+  }
+
+  if (input.type === "SEARCH_AD") {
+    if (!(input.accessLicense ?? "").trim()) {
+      missingFields.push("Access License");
+    }
+    if (!(input.secretKey ?? "").trim()) {
+      missingFields.push("Secret Key");
+    }
+    if (!(input.customerId ?? "").trim()) {
+      missingFields.push("Customer ID");
+    }
+  }
+
+  if (input.type === "COMMERCE") {
+    if (!(input.accessLicense ?? "").trim()) {
+      missingFields.push("Access License");
+    }
+    if (!(input.secretKey ?? "").trim()) {
+      missingFields.push("Secret Key");
+    }
+    if (!(input.storeId ?? "").trim() && !(input.channelId ?? "").trim()) {
+      missingFields.push("Store ID or Channel ID");
+    }
+  }
+
+  return missingFields;
 }
 
 function getAccountReadinessState(account: ApiAccount): AccountReadinessState {

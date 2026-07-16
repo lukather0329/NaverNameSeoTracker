@@ -78,6 +78,31 @@ router.get("/snapshot", async (_req, res) => {
       prisma.systemLog.findMany({ orderBy: { createdAt: "desc" }, take: 20 })
     ]);
 
+  const latestAccountTestLogByAccountId = new Map(
+    systemLogs
+      .filter((item) => item.scope === "api-account-test")
+      .map((item) => {
+        try {
+          const meta = JSON.parse(item.metaJson ?? "{}") as {
+            accountId?: string | null;
+            mode?: string | null;
+            statusCode?: number | null;
+            details?: string | null;
+          };
+
+          return [
+            meta.accountId ?? "",
+            [meta.mode ? `mode=${meta.mode}` : "", typeof meta.statusCode === "number" ? `status=${meta.statusCode}` : "", meta.details ?? ""]
+              .filter(Boolean)
+              .join(" | ")
+          ] as const;
+        } catch {
+          return ["", ""] as const;
+        }
+      })
+      .filter((entry) => entry[0])
+  );
+
   res.json({
     dashboard,
     apiAccounts: apiAccounts.map((item: (typeof apiAccounts)[number]) => ({

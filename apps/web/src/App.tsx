@@ -366,6 +366,12 @@ function ApiAccountsView({
           { key: "storeId", title: "Store ID", width: 140 },
           { key: "channelId", title: "Channel ID", width: 140 },
           {
+            key: "lastTestSummary",
+            title: "최근 테스트",
+            width: 260,
+            render: (row) => row.lastTestSummary ?? "-"
+          },
+          {
             key: "connectionStatus",
             title: "상태",
             width: 120,
@@ -420,7 +426,7 @@ function ApiAccountsView({
               render: (row) => row.metaJson ?? "-"
             }
           ]}
-          rows={systemLogs.filter((row) => row.scope === "api-account-test")}
+          rows={recentAccountTestLogs}
         />
       </div>
     </section>

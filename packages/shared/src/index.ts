@@ -21,6 +21,7 @@ export interface ApiAccount {
   isActive: boolean;
   lastCheckedAt?: string | null;
   connectionStatus: ConnectionStatus;
+  lastTestSummary?: string | null;
   createdAt: string;
   updatedAt: string;
 }

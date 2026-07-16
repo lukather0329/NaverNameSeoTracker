@@ -210,8 +210,8 @@ export function App() {
     <div className="app-shell">
       <aside className="sidebar">
         <div>
-          <p className="eyebrow">SEO Experiment Ops</p>
-          <h1>Naver Name Tracker</h1>
+          <p className="eyebrow">네이버쇼핑 SEO 운영 콘솔</p>
+          <h1>네이버쇼핑 상품명 SEO 검증 추적기</h1>
           <p className="sidebar-copy">상품명 변경 전후 실험을 한 화면에서 추적하는 운영형 콘솔입니다.</p>
         </div>
         <nav className="nav-list">

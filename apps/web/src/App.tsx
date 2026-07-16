@@ -431,16 +431,28 @@ function ApiAccountsView({
             key: "actions",
             title: "Actions",
             width: 240,
-            render: (row) => (
-              <div className="inline-actions">
-                <button type="button" className="action-button secondary" onClick={() => void handleTest(row.id)}>
-                  Test Connection
-                </button>
-                <button type="button" className="action-button secondary" onClick={() => void onToggleAccount(row)}>
-                  {row.isActive ? "Deactivate" : "Activate"}
-                </button>
-              </div>
-            )
+            render: (row) => {
+              const readiness = getAccountReadinessState(row);
+              const canTest = readiness !== "INCOMPLETE";
+              const testLabel = readiness === "LIVE_READY" ? "Run Live Test" : "Run Validation Check";
+
+              return (
+                <div className="inline-actions">
+                  <button
+                    type="button"
+                    className="action-button secondary"
+                    onClick={() => void handleTest(row.id)}
+                    disabled={!canTest}
+                    title={canTest ? testLabel : getAccountReadinessHint(row)}
+                  >
+                    {testLabel}
+                  </button>
+                  <button type="button" className="action-button secondary" onClick={() => void onToggleAccount(row)}>
+                    {row.isActive ? "Deactivate" : "Activate"}
+                  </button>
+                </div>
+              );
+            }
           }
         ]}
         rows={accounts}

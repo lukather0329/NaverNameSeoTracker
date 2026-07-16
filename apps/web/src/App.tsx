@@ -912,6 +912,7 @@ function ReportsView({ snapshot }: { snapshot: AppSnapshot }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [judgementFilter, setJudgementFilter] = useState<string>("ALL");
   const [windowFilter, setWindowFilter] = useState<string>("ALL");
+  const [sortKey, setSortKey] = useState<"LATEST_TRACKED" | "BEST_RANK" | "BEST_DELTA" | "BEST_UP_RATE" | "NAME">("LATEST_TRACKED");
 
   const filteredRows = experimentRows.filter((row) => {
     const normalizedQuery = searchQuery.trim().toLowerCase();
@@ -924,7 +925,8 @@ function ReportsView({ snapshot }: { snapshot: AppSnapshot }) {
     const windowMatch = matchesTrackedWindow(row.trackedAtValue, windowFilter);
     return searchMatch && statusMatch && judgementMatch && windowMatch;
   });
-  const filteredExperimentIds = new Set(filteredRows.map((row) => row.id));
+  const sortedRows = sortExperimentReportRows(filteredRows, sortKey);
+  const filteredExperimentIds = new Set(sortedRows.map((row) => row.id));
   const filteredResults = snapshot.results.filter((row) => filteredExperimentIds.has(row.experimentId));
   const summaryCards = buildReportSummary(snapshot, filteredRows);
 
@@ -933,6 +935,7 @@ function ReportsView({ snapshot }: { snapshot: AppSnapshot }) {
     setSearchQuery("");
     setJudgementFilter("ALL");
     setWindowFilter("ALL");
+    setSortKey("LATEST_TRACKED");
   }
 
   return (
@@ -950,7 +953,7 @@ function ReportsView({ snapshot }: { snapshot: AppSnapshot }) {
           <button
             type="button"
             className="action-button"
-            onClick={() => downloadCsv("experiment-report.csv", buildExperimentCsv(filteredRows))}
+            onClick={() => downloadCsv("experiment-report.csv", buildExperimentCsv(sortedRows))}
           >
             실험 리포트 CSV
           </button>
@@ -970,7 +973,7 @@ function ReportsView({ snapshot }: { snapshot: AppSnapshot }) {
             <h3>리포트 행 필터</h3>
           </div>
           <div className="inline-actions">
-            <span className="filter-summary">실험 {filteredRows.length}개</span>
+            <span className="filter-summary">실험 {sortedRows.length}개</span>
             <button type="button" className="action-button secondary" onClick={resetFilters}>
               필터 초기화
             </button>
@@ -1015,6 +1018,16 @@ function ReportsView({ snapshot }: { snapshot: AppSnapshot }) {
               <option value="90D">최근 90일</option>
             </select>
           </label>
+          <label>
+            <span>정렬</span>
+            <select value={sortKey} onChange={(event) => setSortKey(event.target.value as "LATEST_TRACKED" | "BEST_RANK" | "BEST_DELTA" | "BEST_UP_RATE" | "NAME")}>
+              <option value="LATEST_TRACKED">최신 추적순</option>
+              <option value="BEST_RANK">최신 순위 낮은 순</option>
+              <option value="BEST_DELTA">평균 변화량 높은 순</option>
+              <option value="BEST_UP_RATE">상승 비율 높은 순</option>
+              <option value="NAME">실험명 가나다순</option>
+            </select>
+          </label>
         </div>
       </section>
       <div className="card-grid">
@@ -1033,7 +1046,7 @@ function ReportsView({ snapshot }: { snapshot: AppSnapshot }) {
             <h2>실험 리포트 테이블</h2>
           </div>
         </div>
-        {filteredRows.length === 0 ? (
+        {sortedRows.length === 0 ? (
           <div className="empty-state-card">
             <strong>현재 필터와 일치하는 리포트 행이 없습니다.</strong>
             <p>필터를 초기화하거나 추적 기간을 넓혀 다시 확인해보세요.</p>
@@ -1062,7 +1075,7 @@ function ReportsView({ snapshot }: { snapshot: AppSnapshot }) {
               { key: "upRate", title: "상승 비율", width: 120 },
               { key: "trackedAt", title: "마지막 추적", width: 180 }
             ]}
-            rows={filteredRows}
+            rows={sortedRows}
           />
         )}
       </section>
@@ -1163,6 +1176,74 @@ function matchesTrackedWindow(trackedAtValue: string | undefined, windowFilter: 
     return true;
   }
   return now - trackedAt <= days * 24 * 60 * 60 * 1000;
+}
+
+function sortExperimentReportRows(
+  rows: ExperimentReportRow[],
+  sortKey: "LATEST_TRACKED" | "BEST_RANK" | "BEST_DELTA" | "BEST_UP_RATE" | "NAME"
+) {
+  return rows.slice().sort((left, right) => {
+    if (sortKey === "NAME") {
+      return left.name.localeCompare(right.name, "ko");
+    }
+
+    if (sortKey === "BEST_RANK") {
+      return compareNullableNumbers(parseReportNumber(left.latestRank), parseReportNumber(right.latestRank), true);
+    }
+
+    if (sortKey === "BEST_DELTA") {
+      return compareNullableNumbers(parseReportNumber(left.avgDelta), parseReportNumber(right.avgDelta), false);
+    }
+
+    if (sortKey === "BEST_UP_RATE") {
+      return compareNullableNumbers(parsePercent(left.upRate), parsePercent(right.upRate), false);
+    }
+
+    return compareNullableNumbers(parseTrackedAt(left.trackedAtValue), parseTrackedAt(right.trackedAtValue), false);
+  });
+}
+
+function parseReportNumber(value: string) {
+  if (value === "-") {
+    return null;
+  }
+
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function parsePercent(value: string) {
+  if (value === "-") {
+    return null;
+  }
+
+  const parsed = Number(value.replace("%", ""));
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function parseTrackedAt(value?: string) {
+  if (!value) {
+    return null;
+  }
+
+  const parsed = new Date(value).getTime();
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function compareNullableNumbers(left: number | null, right: number | null, ascending: boolean) {
+  if (left === null && right === null) {
+    return 0;
+  }
+
+  if (left === null) {
+    return 1;
+  }
+
+  if (right === null) {
+    return -1;
+  }
+
+  return ascending ? left - right : right - left;
 }
 
 function buildExperimentCsv(rows: ExperimentReportRow[]) {

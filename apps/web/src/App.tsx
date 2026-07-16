@@ -43,6 +43,20 @@ type NextActionGuide = {
   title: string;
   description: string;
 };
+type FieldHint = {
+  placeholder: string;
+  helper: string;
+};
+type FieldHintMap = {
+  name: FieldHint;
+  clientId: FieldHint;
+  clientSecret: FieldHint;
+  accessLicense: FieldHint;
+  secretKey: FieldHint;
+  customerId: FieldHint;
+  storeId: FieldHint;
+  channelId: FieldHint;
+};
 type ExperimentReportRow = {
   id: string;
   name: string;
@@ -291,6 +305,7 @@ function ApiAccountsView({
   const currentRequiredFields = getCurrentRequiredFields(form.type);
   const requiredFieldSet = new Set(currentRequiredFields);
   const nextActionGuide = buildNextActionGuide(accounts, formReadiness, form.type);
+  const fieldHints = buildFieldHints(form.type);
   const needsAdvancedCredentials = form.type !== "CUSTOM";
   const needsCustomerId = form.type === "SEARCH_AD";
   const needsCommerceTargets = form.type === "COMMERCE";
@@ -395,7 +410,8 @@ function ApiAccountsView({
       <form className="account-form" onSubmit={handleSubmit}>
         <label className={getFormFieldClassName(requiredFieldSet, "Account Name")}>
           <span>{renderFieldLabel("Account Name", requiredFieldSet)}</span>
-          <input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} required />
+          <input value={form.name} placeholder={fieldHints.name.placeholder} onChange={(event) => setForm({ ...form, name: event.target.value })} required />
+          <small className="field-helper">{fieldHints.name.helper}</small>
         </label>
         <label className="field-required">
           <span>Type <em className="field-badge required">Required</em></span>
@@ -410,39 +426,46 @@ function ApiAccountsView({
         </label>
         <label className={getFormFieldClassName(requiredFieldSet, "Client ID")}>
           <span>{renderFieldLabel("Client ID", requiredFieldSet)}</span>
-          <input value={form.clientId} onChange={(event) => setForm({ ...form, clientId: event.target.value })} required />
+          <input value={form.clientId} placeholder={fieldHints.clientId.placeholder} onChange={(event) => setForm({ ...form, clientId: event.target.value })} required />
+          <small className="field-helper">{fieldHints.clientId.helper}</small>
         </label>
         <label className={getFormFieldClassName(requiredFieldSet, "Client Secret")}>
           <span>{renderFieldLabel("Client Secret", requiredFieldSet)}</span>
-          <input value={form.clientSecret} onChange={(event) => setForm({ ...form, clientSecret: event.target.value })} required />
+          <input value={form.clientSecret} placeholder={fieldHints.clientSecret.placeholder} onChange={(event) => setForm({ ...form, clientSecret: event.target.value })} required />
+          <small className="field-helper">{fieldHints.clientSecret.helper}</small>
         </label>
         {needsAdvancedCredentials && (
           <>
             <label className={getFormFieldClassName(requiredFieldSet, "Access License")}>
               <span>{renderFieldLabel("Access License", requiredFieldSet)}</span>
-              <input value={form.accessLicense ?? ""} onChange={(event) => setForm({ ...form, accessLicense: event.target.value })} />
+              <input value={form.accessLicense ?? ""} placeholder={fieldHints.accessLicense.placeholder} onChange={(event) => setForm({ ...form, accessLicense: event.target.value })} />
+              <small className="field-helper">{fieldHints.accessLicense.helper}</small>
             </label>
             <label className={getFormFieldClassName(requiredFieldSet, "Secret Key")}>
               <span>{renderFieldLabel("Secret Key", requiredFieldSet)}</span>
-              <input value={form.secretKey ?? ""} onChange={(event) => setForm({ ...form, secretKey: event.target.value })} />
+              <input value={form.secretKey ?? ""} placeholder={fieldHints.secretKey.placeholder} onChange={(event) => setForm({ ...form, secretKey: event.target.value })} />
+              <small className="field-helper">{fieldHints.secretKey.helper}</small>
             </label>
           </>
         )}
         {needsCustomerId && (
           <label className={getFormFieldClassName(requiredFieldSet, "Customer ID")}>
             <span>{renderFieldLabel("Customer ID", requiredFieldSet)}</span>
-            <input value={form.customerId ?? ""} onChange={(event) => setForm({ ...form, customerId: event.target.value })} />
+            <input value={form.customerId ?? ""} placeholder={fieldHints.customerId.placeholder} onChange={(event) => setForm({ ...form, customerId: event.target.value })} />
+            <small className="field-helper">{fieldHints.customerId.helper}</small>
           </label>
         )}
         {needsCommerceTargets && (
           <>
             <label className={getFormFieldClassName(requiredFieldSet, "Store ID or Channel ID", "Store ID")}>
               <span>{renderFieldLabel("Store ID or Channel ID", requiredFieldSet, "Store ID")}</span>
-              <input value={form.storeId ?? ""} onChange={(event) => setForm({ ...form, storeId: event.target.value })} />
+              <input value={form.storeId ?? ""} placeholder={fieldHints.storeId.placeholder} onChange={(event) => setForm({ ...form, storeId: event.target.value })} />
+              <small className="field-helper">{fieldHints.storeId.helper}</small>
             </label>
             <label className={getFormFieldClassName(requiredFieldSet, "Store ID or Channel ID", "Channel ID")}>
               <span>{renderFieldLabel("Store ID or Channel ID", requiredFieldSet, "Channel ID")}</span>
-              <input value={form.channelId ?? ""} onChange={(event) => setForm({ ...form, channelId: event.target.value })} />
+              <input value={form.channelId ?? ""} placeholder={fieldHints.channelId.placeholder} onChange={(event) => setForm({ ...form, channelId: event.target.value })} />
+              <small className="field-helper">{fieldHints.channelId.helper}</small>
             </label>
           </>
         )}
@@ -1029,6 +1052,43 @@ function downloadCsv(fileName: string, csvText: string) {
   anchor.download = fileName;
   anchor.click();
   URL.revokeObjectURL(url);
+}
+
+function buildFieldHints(type: ApiAccountFormInput["type"]): FieldHintMap {
+  return {
+    name: {
+      placeholder: type === "SEARCH_AD" ? "e.g. Main SearchAd Account" : type === "COMMERCE" ? "e.g. Smartstore Commerce Account" : "e.g. Internal Integration Account",
+      helper: "Use a name your team can recognize quickly."
+    },
+    clientId: {
+      placeholder: "Enter the issued client ID",
+      helper: "Copy the value exactly as issued by the provider."
+    },
+    clientSecret: {
+      placeholder: "Enter the issued client secret",
+      helper: "Paste the secret carefully without trimming internal characters."
+    },
+    accessLicense: {
+      placeholder: type === "SEARCH_AD" ? "SearchAd access license" : "Commerce access license",
+      helper: type === "SEARCH_AD" ? "Required for the SearchAd live test." : "Required for commerce validation and future live calls."
+    },
+    secretKey: {
+      placeholder: type === "SEARCH_AD" ? "SearchAd secret key" : "Commerce secret key",
+      helper: type === "SEARCH_AD" ? "Used to sign the live SearchAd request." : "Needed for commerce validation and future live calls."
+    },
+    customerId: {
+      placeholder: "SearchAd customer ID",
+      helper: "Only needed for SearchAd live testing."
+    },
+    storeId: {
+      placeholder: "Commerce store ID",
+      helper: "Use this if your commerce integration is store-based."
+    },
+    channelId: {
+      placeholder: "Commerce channel ID",
+      helper: "Use this if your commerce integration is channel-based."
+    }
+  };
 }
 
 function buildNextActionGuide(accounts: ApiAccount[], formReadiness: FormReadinessPreview, currentType: ApiAccountFormInput["type"]): NextActionGuide {

@@ -494,6 +494,15 @@ select {
   background: rgba(224, 229, 250, 0.88);
 }
 
+
+.field-helper {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
 .account-form input,
 .account-form select {
   width: 100%;

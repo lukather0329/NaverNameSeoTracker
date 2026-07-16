@@ -1,4 +1,4 @@
-import type { FormEvent } from "react";
+﻿import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
 import type {
   ApiAccount,
@@ -116,19 +116,19 @@ const accountTypeGuides: Record<
   { modeLabel: string; requiredFields: string[]; note: string }
 > = {
   SEARCH_AD: {
-    modeLabel: "?? ?? ?? ???",
-    requiredFields: ["????? ID", "????? ???", "??? ????", "??? ?", "?? ID"],
-    note: "??? ???? ?? ?? ??? ?????? ?????."
+    modeLabel: "실제 외부 연동 테스트",
+    requiredFields: ["클라이언트 ID", "클라이언트 시크릿", "액세스 라이선스", "시크릿 키", "고객 ID"],
+    note: "네이버 검색광고 실제 연결 테스트 엔드포인트를 사용합니다."
   },
   COMMERCE: {
-    modeLabel: "?? ??",
-    requiredFields: ["????? ID", "????? ???", "??? ????", "??? ?", "??? ID ?? ?? ID"],
-    note: "??? ??? ???? ?? ?? ?????."
+    modeLabel: "검증 전용",
+    requiredFields: ["클라이언트 ID", "클라이언트 시크릿", "액세스 라이선스", "시크릿 키", "스토어 ID 또는 채널 ID"],
+    note: "커머스 실연동 어댑터는 다음 후속 작업입니다."
   },
   CUSTOM: {
-    modeLabel: "?? ??",
-    requiredFields: ["????? ID", "????? ???"],
-    note: "?? ??? ?? ?? ????? ??? ?????."
+    modeLabel: "검증 전용",
+    requiredFields: ["클라이언트 ID", "클라이언트 시크릿"],
+    note: "향후 어댑터 또는 내부 연동용으로 남겨둔 유형입니다."
   }
 };
 const accountSaveTimingGuides: Record<
@@ -136,27 +136,27 @@ const accountSaveTimingGuides: Record<
   { recommendedMoment: string; steps: string[] }
 > = {
   SEARCH_AD: {
-    recommendedMoment: "? ?? ?? ???? ???? ??? ?????.",
+    recommendedMoment: "첫 실제 연결 테스트를 시작하기 직전에 저장하세요.",
     steps: [
-      "?? ????? ID, ????? ???, ??? ????, ??? ?, ?? ID? ?????.",
-      "?? ?? ???? ?? ???? ? ?? ? ??? ?????.",
-      "?? ?? ???? ??? ????? ?? ?????."
+      "실제 클라이언트 ID, 클라이언트 시크릿, 액세스 라이선스, 시크릿 키, 고객 ID를 준비합니다.",
+      "값이 모두 확인되어 바로 테스트할 수 있을 때 계정을 저장합니다.",
+      "바로 연결 테스트를 실행해 자격정보를 즉시 검증합니다."
     ]
   },
   COMMERCE: {
-    recommendedMoment: "????? ?? ?, ?? ??? ??? ?? ?? ?????.",
+    recommendedMoment: "자격정보를 모은 뒤, 향후 실연동 어댑터 적용 전에 저장하세요.",
     steps: [
-      "?? ????? ?? ??? ????, ??? ?, ??? ID ?? ?? ID? ?????.",
-      "?? ? ??? ???? ???? ??? ?? ?????.",
-      "COMMERCE? ?? ?? ????? ?? ?? ???? ?? ??? ?????."
+      "기본 자격정보와 함께 액세스 라이선스, 시크릿 키, 스토어 ID 또는 채널 ID를 준비합니다.",
+      "팀이 한 곳에서 검토하고 관리해야 한다면 지금 저장하세요.",
+      "COMMERCE는 현재 검증 전용이므로 실제 외부 테스트는 다음 단계로 계획하세요."
     ]
   },
   CUSTOM: {
-    recommendedMoment: "?? ????? ?? ?? ??? ??? ?? ?????.",
+    recommendedMoment: "기본 자격정보가 내부 검토 가능한 상태가 되면 저장하세요.",
     steps: [
-      "?? ????? ID? ????? ???? ?????.",
-      "?? ?? ??? ?? ???? ? ??? ??? ?????.",
-      "? ?? ??? ?? ?? ?? ??? ??? ?? ??? ???? ?????."
+      "먼저 클라이언트 ID와 클라이언트 시크릿을 준비합니다.",
+      "팀이 연동 대상을 함께 관리해야 할 시점에 계정을 저장합니다.",
+      "이 계정 유형에 실제 외부 연결 흐름이 생기면 이후 실연동 어댑터를 추가합니다."
     ]
   }
 };
@@ -346,7 +346,7 @@ function ApiAccountsView({
     return readinessMatch && activeMatch && logLinkedMatch;
   });
   const accountScopeSummary = shouldLinkAccountsToLogs
-    ? `??? ?? ${filteredLogRows.length}?? ???`
+    ? `필터된 로그 ${filteredLogRows.length}건과 연결됨`
     : null;
   const formReadiness = buildFormReadinessPreview(form);
   const canSaveAccount = formReadiness.state !== "INCOMPLETE";
@@ -355,17 +355,17 @@ function ApiAccountsView({
   const nextActionGuide = buildNextActionGuide(accounts, formReadiness, form.type);
   const fieldHints = buildFieldHints(form.type);
   const accountFilterOptions: Array<{ value: AccountFilterValue; label: string }> = [
-    { value: "ALL", label: `?? (${accounts.length})` },
-    { value: "LIVE_READY", label: `???? ?? (${accounts.filter((account) => getAccountReadinessState(account) === "LIVE_READY").length})` },
-    { value: "VALIDATION_READY", label: `?? ?? (${accounts.filter((account) => getAccountReadinessState(account) === "VALIDATION_READY").length})` },
-    { value: "INCOMPLETE", label: `??? (${accounts.filter((account) => getAccountReadinessState(account) === "INCOMPLETE").length})` }
+    { value: "ALL", label: `전체 (${accounts.length})` },
+    { value: "LIVE_READY", label: `실테스트 가능 (${accounts.filter((account) => getAccountReadinessState(account) === "LIVE_READY").length})` },
+    { value: "VALIDATION_READY", label: `검증 가능 (${accounts.filter((account) => getAccountReadinessState(account) === "VALIDATION_READY").length})` },
+    { value: "INCOMPLETE", label: `미완료 (${accounts.filter((account) => getAccountReadinessState(account) === "INCOMPLETE").length})` }
   ];
   const logFilterOptions: Array<{ value: AccountLogFilterValue; label: string }> = [
-    { value: "ALL", label: `?? (${recentAccountTestLogs.length})` },
-    { value: "FAILED", label: `?? (${recentAccountTestLogs.filter((row) => row.outcome === "FAILED").length})` },
-    { value: "SUCCESS", label: `?? (${recentAccountTestLogs.filter((row) => row.outcome === "SUCCESS").length})` },
-    { value: "REAL", label: `??? (${recentAccountTestLogs.filter((row) => row.testMode === "REAL").length})` },
-    { value: "VALIDATION", label: `?? (${recentAccountTestLogs.filter((row) => row.testMode === "VALIDATION").length})` }
+    { value: "ALL", label: `전체 (${recentAccountTestLogs.length})` },
+    { value: "FAILED", label: `실패 (${recentAccountTestLogs.filter((row) => row.outcome === "FAILED").length})` },
+    { value: "SUCCESS", label: `성공 (${recentAccountTestLogs.filter((row) => row.outcome === "SUCCESS").length})` },
+    { value: "REAL", label: `실연동 (${recentAccountTestLogs.filter((row) => row.testMode === "REAL").length})` },
+    { value: "VALIDATION", label: `검증 (${recentAccountTestLogs.filter((row) => row.testMode === "VALIDATION").length})` }
   ];
   const needsAdvancedCredentials = form.type !== "CUSTOM";
   const needsCustomerId = form.type === "SEARCH_AD";
@@ -378,7 +378,7 @@ function ApiAccountsView({
     if (!canSaveAccount) {
       setFeedback({
         tone: "warning",
-        message: `?? ???? ?? ?????: ${formReadiness.missingFields.join(", ")}`
+        message: `필수 입력값을 먼저 채워주세요: ${formReadiness.missingFields.join(", ")}`
       });
       return;
     }
@@ -411,9 +411,9 @@ function ApiAccountsView({
     <section className="panel">
       <div className="section-heading">
         <div>
-          <p className="eyebrow">?? ??</p>
-          <h2>??? API ??</h2>
-          <p className="helper-copy">SEARCH_AD? ?? ?? API ???? ????, COMMERCE? CUSTOM? ?? ?? ?? ??? ?????.</p>
+          <p className="eyebrow">연결 상태</p>
+          <h2>네이버 API 계정</h2>
+          <p className="helper-copy">SEARCH_AD는 실제 외부 API 테스트를 수행하고, COMMERCE와 CUSTOM은 현재 검증 전용 점검만 지원합니다.</p>
           <div className="type-guide-card">
             <strong>{accountGuide.modeLabel}</strong>
             <p>{accountGuide.note}</p>
@@ -426,7 +426,7 @@ function ApiAccountsView({
             </div>
           </div>
           <div className="save-timing-card">
-            <strong>API ??? ?? ???? ????</strong>
+            <strong>API 정보는 언제 저장하면 되나요?</strong>
             <p>{saveTimingGuide.recommendedMoment}</p>
             <ol className="guide-step-list">
               {saveTimingGuide.steps.map((step: string) => (
@@ -452,7 +452,7 @@ function ApiAccountsView({
                   type="button"
                   className={`metric-card panel compact-card focus-card ${item.toneClass}${isActive ? " active" : ""}`}
                   onClick={() => setLogFilter(isActive ? "ALL" : item.filterValue)}
-                  title={isActive ? "?? ?? ??" : `${item.label} ???? ?? ???`}
+                  title={isActive ? "전체 로그 보기" : `${item.label} 기준으로 로그 필터링`}
                 >
                   <span>{item.label}</span>
                   <strong>{item.value}</strong>
@@ -464,15 +464,15 @@ function ApiAccountsView({
         </div>
       </div>
       <div className="next-action-card">
-        <p className="eyebrow">?? ??</p>
+        <p className="eyebrow">성과 개요</p>
         <strong>{nextActionGuide.title}</strong>
         <p>{nextActionGuide.description}</p>
       </div>
       <div className="form-checklist-card">
         <div className="section-heading">
           <div>
-            <p className="eyebrow">?? ?????</p>
-            <h3>?? ??? ??</h3>
+            <p className="eyebrow">입력 체크리스트</p>
+            <h3>지금 필요한 항목</h3>
           </div>
         </div>
         <div className="guide-chip-row">
@@ -486,71 +486,71 @@ function ApiAccountsView({
           <div className="guide-chip-row">
             {formReadiness.missingFields.map((field) => (
               <span key={field} className="guide-chip muted">
-                ??: {field}
+                누락: {field}
               </span>
             ))}
           </div>
         ) : (
-          <p className="checklist-success">?? ???? ??? ??? ?? ???????.</p>
+          <p className="checklist-success">현재 흐름에서 필요한 항목이 모두 입력되었습니다.</p>
         )}
       </div>
       <form className="account-form" onSubmit={handleSubmit}>
-        <label className={getFormFieldClassName(requiredFieldSet, "???")}>
-          <span>{renderFieldLabel("???", requiredFieldSet)}</span>
+        <label className={getFormFieldClassName(requiredFieldSet, "계정명")}>
+          <span>{renderFieldLabel("계정명", requiredFieldSet)}</span>
           <input value={form.name} placeholder={fieldHints.name.placeholder} onChange={(event) => setForm({ ...form, name: event.target.value })} required />
           <small className="field-helper">{fieldHints.name.helper}</small>
         </label>
         <label className="field-required">
-          <span>?? <em className="field-badge required">??</em></span>
+          <span>유형 <em className="field-badge required">필수</em></span>
           <select
             value={form.type}
             onChange={(event) => setForm({ ...form, type: event.target.value as ApiAccountFormInput["type"] })}
           >
-            <option value="COMMERCE">??? ??? API</option>
-            <option value="SEARCH_AD">??? ???? API</option>
-            <option value="CUSTOM">??? / ?? ???</option>
+            <option value="COMMERCE">네이버 커머스 API</option>
+            <option value="SEARCH_AD">네이버 검색광고 API</option>
+            <option value="CUSTOM">커스텀 / 향후 어댑터</option>
           </select>
         </label>
-        <label className={getFormFieldClassName(requiredFieldSet, "????? ID")}>
-          <span>{renderFieldLabel("????? ID", requiredFieldSet)}</span>
+        <label className={getFormFieldClassName(requiredFieldSet, "클라이언트 ID")}>
+          <span>{renderFieldLabel("클라이언트 ID", requiredFieldSet)}</span>
           <input value={form.clientId} placeholder={fieldHints.clientId.placeholder} onChange={(event) => setForm({ ...form, clientId: event.target.value })} required />
           <small className="field-helper">{fieldHints.clientId.helper}</small>
         </label>
-        <label className={getFormFieldClassName(requiredFieldSet, "????? ???")}>
-          <span>{renderFieldLabel("????? ???", requiredFieldSet)}</span>
+        <label className={getFormFieldClassName(requiredFieldSet, "클라이언트 시크릿")}>
+          <span>{renderFieldLabel("클라이언트 시크릿", requiredFieldSet)}</span>
           <input value={form.clientSecret} placeholder={fieldHints.clientSecret.placeholder} onChange={(event) => setForm({ ...form, clientSecret: event.target.value })} required />
           <small className="field-helper">{fieldHints.clientSecret.helper}</small>
         </label>
         {needsAdvancedCredentials && (
           <>
-            <label className={getFormFieldClassName(requiredFieldSet, "??? ????")}>
-              <span>{renderFieldLabel("??? ????", requiredFieldSet)}</span>
+            <label className={getFormFieldClassName(requiredFieldSet, "액세스 라이선스")}>
+              <span>{renderFieldLabel("액세스 라이선스", requiredFieldSet)}</span>
               <input value={form.accessLicense ?? ""} placeholder={fieldHints.accessLicense.placeholder} onChange={(event) => setForm({ ...form, accessLicense: event.target.value })} />
               <small className="field-helper">{fieldHints.accessLicense.helper}</small>
             </label>
-            <label className={getFormFieldClassName(requiredFieldSet, "??? ?")}>
-              <span>{renderFieldLabel("??? ?", requiredFieldSet)}</span>
+            <label className={getFormFieldClassName(requiredFieldSet, "시크릿 키")}>
+              <span>{renderFieldLabel("시크릿 키", requiredFieldSet)}</span>
               <input value={form.secretKey ?? ""} placeholder={fieldHints.secretKey.placeholder} onChange={(event) => setForm({ ...form, secretKey: event.target.value })} />
               <small className="field-helper">{fieldHints.secretKey.helper}</small>
             </label>
           </>
         )}
         {needsCustomerId && (
-          <label className={getFormFieldClassName(requiredFieldSet, "?? ID")}>
-            <span>{renderFieldLabel("?? ID", requiredFieldSet)}</span>
+          <label className={getFormFieldClassName(requiredFieldSet, "고객 ID")}>
+            <span>{renderFieldLabel("고객 ID", requiredFieldSet)}</span>
             <input value={form.customerId ?? ""} placeholder={fieldHints.customerId.placeholder} onChange={(event) => setForm({ ...form, customerId: event.target.value })} />
             <small className="field-helper">{fieldHints.customerId.helper}</small>
           </label>
         )}
         {needsCommerceTargets && (
           <>
-            <label className={getFormFieldClassName(requiredFieldSet, "??? ID ?? ?? ID", "??? ID")}>
-              <span>{renderFieldLabel("??? ID ?? ?? ID", requiredFieldSet, "??? ID")}</span>
+            <label className={getFormFieldClassName(requiredFieldSet, "스토어 ID 또는 채널 ID", "스토어 ID")}>
+              <span>{renderFieldLabel("스토어 ID 또는 채널 ID", requiredFieldSet, "스토어 ID")}</span>
               <input value={form.storeId ?? ""} placeholder={fieldHints.storeId.placeholder} onChange={(event) => setForm({ ...form, storeId: event.target.value })} />
               <small className="field-helper">{fieldHints.storeId.helper}</small>
             </label>
-            <label className={getFormFieldClassName(requiredFieldSet, "??? ID ?? ?? ID", "?? ID")}>
-              <span>{renderFieldLabel("??? ID ?? ?? ID", requiredFieldSet, "?? ID")}</span>
+            <label className={getFormFieldClassName(requiredFieldSet, "스토어 ID 또는 채널 ID", "채널 ID")}>
+              <span>{renderFieldLabel("스토어 ID 또는 채널 ID", requiredFieldSet, "채널 ID")}</span>
               <input value={form.channelId ?? ""} placeholder={fieldHints.channelId.placeholder} onChange={(event) => setForm({ ...form, channelId: event.target.value })} />
               <small className="field-helper">{fieldHints.channelId.helper}</small>
             </label>
@@ -558,22 +558,22 @@ function ApiAccountsView({
         )}
         <label className="checkbox-field field-optional">
           <input type="checkbox" checked={form.isActive} onChange={(event) => setForm({ ...form, isActive: event.target.checked })} />
-          <span>???</span>
+          <span>활성화</span>
         </label>
         <button
           type="submit"
           className="action-button"
           disabled={submitting || !canSaveAccount}
-          title={canSaveAccount ? "?? ??" : formReadiness.missingFields.join(", ")}
+          title={canSaveAccount ? "계정 저장" : formReadiness.missingFields.join(", ")}
         >
-          {submitting ? "?? ?..." : canSaveAccount ? "?? ??" : "?? ?? ?? ??"}
+          {submitting ? "저장 중..." : canSaveAccount ? "계정 저장" : "필수 항목 입력 필요"}
         </button>
       </form>
       <div className="form-readiness-card">
         <div className="section-heading">
           <div>
-            <p className="eyebrow">?? ????</p>
-            <h3>?? ??? ?? ??</h3>
+            <p className="eyebrow">입력 미리보기</p>
+            <h3>현재 테스트 준비 상태</h3>
           </div>
           <StatusBadge value={formReadiness.state} />
         </div>
@@ -605,59 +605,59 @@ function ApiAccountsView({
         </div>
         <label className="filter-toggle">
           <input type="checkbox" checked={activeOnly} onChange={(event) => setActiveOnly(event.target.checked)} />
-          <span>?? ??? ??</span>
+          <span>활성 계정만 보기</span>
         </label>
       </div>
       <div className="account-filter-summary">
-        <strong>{filteredAccounts.length}</strong> / {accounts.length}? ?? ?? ?
+        <strong>{filteredAccounts.length}</strong> / {accounts.length}개 계정 표시 중
         {accountScopeSummary && <span className="account-scope-note">{accountScopeSummary}</span>}
       </div>
       <DataGrid
         columns={[
-          { key: "name", title: "Account", width: 180, sticky: true },
-          { key: "type", title: "??", width: 120 },
-          { key: "clientIdMasked", title: "????? ID", width: 160 },
-          { key: "clientSecretMasked", title: "????? ???", width: 180 },
-          { key: "storeId", title: "??? ID", width: 140 },
-          { key: "channelId", title: "?? ID", width: 140 },
+          { key: "name", title: "계정명", width: 180, sticky: true },
+          { key: "type", title: "유형", width: 120 },
+          { key: "clientIdMasked", title: "클라이언트 ID", width: 160 },
+          { key: "clientSecretMasked", title: "클라이언트 시크릿", width: 180 },
+          { key: "storeId", title: "스토어 ID", width: 140 },
+          { key: "channelId", title: "채널 ID", width: 140 },
           {
             key: "readiness",
-            title: "?? ??",
+            title: "준비 상태",
             width: 150,
             render: (row) => <StatusBadge value={getAccountReadinessState(row)} />
           },
           {
             key: "readinessHint",
-            title: "??? ??",
+            title: "테스트 모드",
             width: 220,
             render: (row) => getAccountReadinessHint(row)
           },
           {
             key: "lastTestSummary",
-            title: "?? ???",
+            title: "최근 테스트",
             width: 260,
             render: (row) => row.lastTestSummary ?? "-"
           },
           {
             key: "connectionStatus",
-            title: "??",
+            title: "상세",
             width: 120,
             render: (row) => <StatusBadge value={row.connectionStatus} />
           },
           {
             key: "isActive",
-            title: "??",
+            title: "상세",
             width: 100,
             render: (row) => <StatusBadge value={row.isActive ? "CONNECTED" : "PAUSED"} />
           },
           {
             key: "actions",
-            title: "??",
+            title: "상세",
             width: 240,
             render: (row) => {
               const readiness = getAccountReadinessState(row);
               const canTest = readiness !== "INCOMPLETE";
-              const testLabel = readiness === "LIVE_READY" ? "??? ??? ??" : "?? ?? ??";
+              const testLabel = readiness === "LIVE_READY" ? "실연동 테스트 실행" : "검증 점검 실행";
 
               return (
                 <div className="inline-actions">
@@ -671,7 +671,7 @@ function ApiAccountsView({
                     {testLabel}
                   </button>
                   <button type="button" className="action-button secondary" onClick={() => void onToggleAccount(row)}>
-                    {row.isActive ? "????" : "???"}
+                    {row.isActive ? "비활성화" : "활성화"}
                   </button>
                 </div>
               );
@@ -683,8 +683,8 @@ function ApiAccountsView({
       <div className="log-panel">
         <div className="section-heading">
           <div>
-            <p className="eyebrow">??? ??</p>
-            <h3>?? API ?? ??? ??</h3>
+            <p className="eyebrow">테스트 이력</p>
+            <h3>최근 API 계정 테스트 로그</h3>
           </div>
         </div>
         <div className="account-filter-bar log-filter-bar">
@@ -701,7 +701,7 @@ function ApiAccountsView({
             ))}
           </div>
           <div className="account-filter-summary">
-            <strong>{filteredLogRows.length}</strong> / {recentAccountTestLogs.length}? ?? ?? ?
+            <strong>{filteredLogRows.length}</strong> / {recentAccountTestLogs.length}개 로그 표시 중
           </div>
         </div>
         {recentAccountTestLogs.length === 0 ? (
@@ -719,13 +719,13 @@ function ApiAccountsView({
                 sticky: true,
                 render: (row) => formatDateTime(row.createdAt)
               },
-              { key: "level", title: "??", width: 100, render: (row) => <StatusBadge value={row.level} /> },
-              { key: "outcome", title: "??", width: 120, render: (row) => <StatusBadge value={row.outcome} /> },
-              { key: "testMode", title: "??", width: 130, render: (row) => <StatusBadge value={row.testMode} /> },
-              { key: "message", title: "???", width: 320 },
+              { key: "level", title: "레벨", width: 100, render: (row) => <StatusBadge value={row.level} /> },
+              { key: "outcome", title: "결과", width: 120, render: (row) => <StatusBadge value={row.outcome} /> },
+              { key: "testMode", title: "모드", width: 130, render: (row) => <StatusBadge value={row.testMode} /> },
+              { key: "message", title: "메시지", width: 320 },
               {
                 key: "detailSummary",
-                title: "??",
+                title: "상세",
                 width: 360,
                 render: (row) => row.detailSummary
               }
@@ -915,11 +915,11 @@ function ReportsView({ snapshot }: { snapshot: AppSnapshot }) {
     <section className="dashboard report-layout">
       <div className="panel report-hero">
         <div>
-          <p className="eyebrow">Weekly / Monthly Share</p>
-          <h2>Report Summary and Export</h2>
+          <p className="eyebrow">주간 / 월간 공유</p>
+          <h2>리포트 요약 및 내보내기</h2>
           <p>
-            Summarize experiment performance in one place and export filtered report rows for team reviews,
-            handoff notes, or weekly reporting.
+            실험 성과를 한 곳에 모아 보고, 필터링된 리포트 행을 팀 리뷰용으로 내보낼 수 있습니다.
+            인수인계 메모나 주간 보고에도 바로 활용할 수 있습니다.
           </p>
         </div>
         <div className="inline-actions">
@@ -928,35 +928,35 @@ function ReportsView({ snapshot }: { snapshot: AppSnapshot }) {
             className="action-button"
             onClick={() => downloadCsv("experiment-report.csv", buildExperimentCsv(filteredRows))}
           >
-            Experiment CSV
+            실험 리포트 CSV
           </button>
           <button
             type="button"
             className="action-button"
             onClick={() => downloadCsv("rank-results.csv", buildResultsCsv(filteredResults, snapshot.products))}
           >
-            Rank Result CSV
+            랭킹 결과 CSV
           </button>
         </div>
       </div>
       <section className="panel report-filter-panel">
         <div className="section-heading">
           <div>
-            <p className="eyebrow">Report Filters</p>
-            <h3>Filter Report Rows</h3>
+            <p className="eyebrow">리포트 필터</p>
+            <h3>리포트 행 필터</h3>
           </div>
           <div className="inline-actions">
-            <span className="filter-summary">{filteredRows.length} experiments</span>
+            <span className="filter-summary">실험 {filteredRows.length}개</span>
             <button type="button" className="action-button secondary" onClick={resetFilters}>
-              Reset Filters
+              필터 초기화
             </button>
           </div>
         </div>
         <div className="report-filters">
           <label>
-            <span>Status</span>
+            <span>상태</span>
             <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
-              <option value="ALL">All</option>
+              <option value="ALL">전체</option>
               <option value="DRAFT">DRAFT</option>
               <option value="RUNNING">RUNNING</option>
               <option value="PAUSED">PAUSED</option>
@@ -965,9 +965,9 @@ function ReportsView({ snapshot }: { snapshot: AppSnapshot }) {
             </select>
           </label>
           <label>
-            <span>Judgement</span>
+            <span>상태</span>
             <select value={judgementFilter} onChange={(event) => setJudgementFilter(event.target.value)}>
-              <option value="ALL">All</option>
+              <option value="ALL">전체</option>
               <option value="EFFECTIVE">EFFECTIVE</option>
               <option value="LOW_EFFECT">LOW_EFFECT</option>
               <option value="PENDING">PENDING</option>
@@ -975,12 +975,12 @@ function ReportsView({ snapshot }: { snapshot: AppSnapshot }) {
             </select>
           </label>
           <label>
-            <span>Tracked Window</span>
+            <span>추적 기간</span>
             <select value={windowFilter} onChange={(event) => setWindowFilter(event.target.value)}>
-              <option value="ALL">All</option>
-              <option value="7D">Last 7 days</option>
-              <option value="30D">Last 30 days</option>
-              <option value="90D">Last 90 days</option>
+              <option value="ALL">전체</option>
+              <option value="7D">최근 7일</option>
+              <option value="30D">최근 30일</option>
+              <option value="90D">최근 90일</option>
             </select>
           </label>
         </div>
@@ -997,38 +997,38 @@ function ReportsView({ snapshot }: { snapshot: AppSnapshot }) {
       <section className="panel">
         <div className="section-heading">
           <div>
-            <p className="eyebrow">Performance Overview</p>
-            <h2>Experiment Report Table</h2>
+            <p className="eyebrow">성과 개요</p>
+            <h2>실험 리포트 테이블</h2>
           </div>
         </div>
         {filteredRows.length === 0 ? (
           <div className="empty-state-card">
-            <strong>No report rows match the current filters.</strong>
-            <p>Reset the filters or widen the tracked window to bring rows back into view.</p>
+            <strong>현재 필터와 일치하는 리포트 행이 없습니다.</strong>
+            <p>필터를 초기화하거나 추적 기간을 넓혀 다시 확인해보세요.</p>
           </div>
         ) : (
           <DataGrid
             columns={[
-              { key: "name", title: "Experiment", width: 220, sticky: true },
-              { key: "productTitle", title: "Product", width: 260 },
+              { key: "name", title: "실험명", width: 220, sticky: true },
+              { key: "productTitle", title: "상품", width: 260 },
               {
                 key: "status",
-                title: "??",
+                title: "상세",
                 width: 120,
                 render: (row) => <StatusBadge value={row.status} />
               },
               {
                 key: "judgement",
-                title: "Judgement",
+                title: "상세",
                 width: 120,
                 render: (row) => <StatusBadge value={row.judgement} />
               },
-              { key: "trackingInterval", title: "Interval", width: 120 },
-              { key: "keywordCount", title: "Keywords", width: 110 },
-              { key: "latestRank", title: "Latest Rank", width: 110 },
-              { key: "avgDelta", title: "Avg Delta", width: 120 },
-              { key: "upRate", title: "Up Rate", width: 120 },
-              { key: "trackedAt", title: "Last Tracked", width: 180 }
+              { key: "trackingInterval", title: "주기", width: 120 },
+              { key: "keywordCount", title: "키워드 수", width: 110 },
+              { key: "latestRank", title: "최신 순위", width: 110 },
+              { key: "avgDelta", title: "평균 변화량", width: 120 },
+              { key: "upRate", title: "상승 비율", width: 120 },
+              { key: "trackedAt", title: "마지막 추적", width: 180 }
             ]}
             rows={filteredRows}
           />
@@ -1185,36 +1185,36 @@ function downloadCsv(fileName: string, csvText: string) {
 function buildFieldHints(type: ApiAccountFormInput["type"]): FieldHintMap {
   return {
     name: {
-      placeholder: type === "SEARCH_AD" ? "?: ?? ???? ??" : type === "COMMERCE" ? "?: ?????? ??? ??" : "?: ?? ?? ??",
-      helper: "?? ?? ??? ? ?? ???? ?????."
+      placeholder: type === "SEARCH_AD" ? "예: 메인 검색광고 계정" : type === "COMMERCE" ? "예: 스마트스토어 커머스 계정" : "예: 내부 연동 계정",
+      helper: "팀이 바로 알아볼 수 있는 이름으로 입력하세요."
     },
     clientId: {
-      placeholder: "??? ????? ID ??",
-      helper: "????? ??? ?? ??? ?????."
+      placeholder: "발급된 클라이언트 ID 입력",
+      helper: "제공처에서 발급된 값을 그대로 입력하세요."
     },
     clientSecret: {
-      placeholder: "??? ????? ??? ??",
-      helper: "?? ??? ??? ??? ??? ??????."
+      placeholder: "발급된 클라이언트 시크릿 입력",
+      helper: "중간 문자가 바뀌지 않도록 그대로 붙여넣으세요."
     },
     accessLicense: {
-      placeholder: type === "SEARCH_AD" ? "???? ??? ????" : "??? ??? ????",
-      helper: type === "SEARCH_AD" ? "???? ??? ???? ?????." : "??? ?? ? ?? ??? ??? ?????."
+      placeholder: type === "SEARCH_AD" ? "검색광고 액세스 라이선스" : "커머스 액세스 라이선스",
+      helper: type === "SEARCH_AD" ? "검색광고 실연동 테스트에 필요합니다." : "커머스 검증 및 향후 실연동 호출에 필요합니다."
     },
     secretKey: {
-      placeholder: type === "SEARCH_AD" ? "???? ??? ?" : "??? ??? ?",
-      helper: type === "SEARCH_AD" ? "???? ??? ?? ??? ?????." : "??? ?? ? ?? ??? ??? ?????."
+      placeholder: type === "SEARCH_AD" ? "검색광고 시크릿 키" : "커머스 시크릿 키",
+      helper: type === "SEARCH_AD" ? "검색광고 실연동 요청 서명에 사용됩니다." : "커머스 검증 및 향후 실연동 호출에 필요합니다."
     },
     customerId: {
-      placeholder: "???? ?? ID",
-      helper: "???? ??? ?????? ?????."
+      placeholder: "검색광고 고객 ID",
+      helper: "검색광고 실연동 테스트에서만 필요합니다."
     },
     storeId: {
-      placeholder: "??? ??? ID",
-      helper: "??? ?? ??? ???? ? ?? ?????."
+      placeholder: "커머스 스토어 ID",
+      helper: "스토어 기반 커머스 연동이면 이 값을 사용하세요."
     },
     channelId: {
-      placeholder: "??? ?? ID",
-      helper: "?? ?? ??? ???? ? ?? ?????."
+      placeholder: "커머스 채널 ID",
+      helper: "채널 기반 커머스 연동이면 이 값을 사용하세요."
     }
   };
 }
@@ -1224,28 +1224,28 @@ function buildNextActionGuide(accounts: ApiAccount[], formReadiness: FormReadine
 
   if (liveReadyAccounts.length > 0) {
     return {
-      title: "???? ??? ???? ?????.",
-      description: `??? ?? ? ${liveReadyAccounts.length}?? ?? ?? ???? ?????. ?? ??? ??? ???? ?????.`
+      title: "검색광고 실연동 테스트를 실행하세요.",
+      description: `저장된 계정 중 ${liveReadyAccounts.length}개는 실제 외부 테스트가 가능합니다. 아래 표에서 실연동 테스트를 실행하세요.`
     };
   }
 
   if (formReadiness.state === "LIVE_READY") {
     return {
-      title: "? ??? ??? ? ??? ???? ?????.",
-      description: "?? SEARCH_AD ???? ?? ?? ?? ??? ??? ? ?? ?????."
+      title: "이 계정을 저장한 뒤 실연동 테스트를 실행하세요.",
+      description: "현재 SEARCH_AD 입력값은 즉시 실제 연결 점검을 실행할 수 있는 상태입니다."
     };
   }
 
   if (formReadiness.state === "VALIDATION_READY") {
     return {
-      title: "?? ?? ????? ? ??? ?????.",
-      description: currentType === "COMMERCE" ? "??? ??? ?? ???? ??? ?, ?? ??? ??? ???? ??? ? ????." : "? ??? ?? ???? ?? ??? ??? ? ????."
+      title: "현재 검증 흐름용으로 이 계정을 저장하세요.",
+      description: currentType === "COMMERCE" ? "커머스 계정은 지금 저장하고 검증한 뒤, 이후 실연동 어댑터 테스트로 확장할 수 있습니다." : "이 계정은 현재 비실연동 검증 흐름에 사용할 수 있습니다."
     };
   }
 
   return {
-    title: "??? ?? ??? ?? ?????.",
-    description: `??? ???? ????? ?? ?? ${formReadiness.missingFields.length}?? ? ???? ???.`
+    title: "강조된 필수 항목을 먼저 입력하세요.",
+    description: `저장과 테스트를 진행하려면 필수 항목 ${formReadiness.missingFields.length}개를 더 입력해야 합니다.`
   };
 }
 
@@ -1259,21 +1259,21 @@ function renderFieldLabel(requirementKey: string, requiredFieldSet: Set<string>,
   const label = displayLabel ?? requirementKey;
   return (
     <>
-      {label} <em className={isRequired ? "field-badge required" : "field-badge optional"}>{isRequired ? "??" : "??"}</em>
+      {label} <em className={isRequired ? "field-badge required" : "field-badge optional"}>{isRequired ? "필수" : "선택"}</em>
     </>
   );
 }
 
 function getCurrentRequiredFields(type: ApiAccountFormInput["type"]) {
   if (type === "SEARCH_AD") {
-    return ["???", "????? ID", "????? ???", "??? ????", "??? ?", "?? ID"];
+    return ["계정명", "클라이언트 ID", "클라이언트 시크릿", "액세스 라이선스", "시크릿 키", "고객 ID"];
   }
 
   if (type === "COMMERCE") {
-    return ["???", "????? ID", "????? ???", "??? ????", "??? ?", "??? ID ?? ?? ID"];
+    return ["계정명", "클라이언트 ID", "클라이언트 시크릿", "액세스 라이선스", "시크릿 키", "스토어 ID 또는 채널 ID"];
   }
 
-  return ["???", "????? ID", "????? ???"];
+  return ["계정명", "클라이언트 ID", "클라이언트 시크릿"];
 }
 
 function buildFormReadinessPreview(input: ApiAccountFormInput): FormReadinessPreview {
@@ -1282,8 +1282,8 @@ function buildFormReadinessPreview(input: ApiAccountFormInput): FormReadinessPre
   if (input.type === "SEARCH_AD" && missingFields.length === 0) {
     return {
       state: "LIVE_READY",
-      title: "? ??? ?? ?? ? ?? ???? ?? ???? ??? ? ????.",
-      caption: "???? ?? ??? ?? ???????.",
+      title: "이 계정은 바로 저장 후 실제 검색광고 연결 테스트를 실행할 수 있습니다.",
+      caption: "검색광고 필수 항목이 모두 입력되었습니다.",
       missingFields
     };
   }
@@ -1291,16 +1291,16 @@ function buildFormReadinessPreview(input: ApiAccountFormInput): FormReadinessPre
   if (input.type !== "SEARCH_AD" && missingFields.length === 0) {
     return {
       state: "VALIDATION_READY",
-      title: "? ??? ?? ?? ??? ??? ??? ?????.",
-      caption: input.type === "COMMERCE" ? "??? ??? ??? ?? ?? ?????." : "??? ??? ?? ?? ??? ?????.",
+      title: "이 계정은 현재 검증 흐름에 사용할 준비가 되었습니다.",
+      caption: input.type === "COMMERCE" ? "커머스 실연동 호출은 아직 후속 작업입니다." : "커스텀 계정은 현재 기본 검증만 지원합니다.",
       missingFields
     };
   }
 
   return {
     state: "INCOMPLETE",
-    title: "? ??? ?????? ?? ??? ?????.",
-    caption: `?? ?? ${missingFields.length}?? ???????.`,
+    title: "이 계정을 테스트하려면 추가 입력이 필요합니다.",
+    caption: `필수 항목 ${missingFields.length}개가 누락되었습니다.`,
     missingFields
   };
 }
@@ -1309,38 +1309,38 @@ function getFormMissingFields(input: ApiAccountFormInput) {
   const missingFields: string[] = [];
 
   if (!input.name.trim()) {
-    missingFields.push("???");
+    missingFields.push("계정명");
   }
 
   if (!input.clientId.trim()) {
-    missingFields.push("????? ID");
+    missingFields.push("클라이언트 ID");
   }
 
   if (!input.clientSecret.trim()) {
-    missingFields.push("????? ???");
+    missingFields.push("클라이언트 시크릿");
   }
 
   if (input.type === "SEARCH_AD") {
     if (!(input.accessLicense ?? "").trim()) {
-      missingFields.push("??? ????");
+      missingFields.push("액세스 라이선스");
     }
     if (!(input.secretKey ?? "").trim()) {
-      missingFields.push("??? ?");
+      missingFields.push("시크릿 키");
     }
     if (!(input.customerId ?? "").trim()) {
-      missingFields.push("?? ID");
+      missingFields.push("고객 ID");
     }
   }
 
   if (input.type === "COMMERCE") {
     if (!(input.accessLicense ?? "").trim()) {
-      missingFields.push("??? ????");
+      missingFields.push("액세스 라이선스");
     }
     if (!(input.secretKey ?? "").trim()) {
-      missingFields.push("??? ?");
+      missingFields.push("시크릿 키");
     }
     if (!(input.storeId ?? "").trim() && !(input.channelId ?? "").trim()) {
-      missingFields.push("??? ID ?? ?? ID");
+      missingFields.push("스토어 ID 또는 채널 ID");
     }
   }
 
@@ -1364,53 +1364,53 @@ function getAccountReadinessHint(account: ApiAccount) {
 
   if (account.type === "SEARCH_AD") {
     return isLiveReadySearchAdAccount(account)
-      ? "?? ?? ??? ??"
-      : `??: ${missingFields.join(", ")}`;
+      ? "실제 외부 테스트 가능"
+      : `누락: ${missingFields.join(", ")}`;
   }
 
   if (account.type === "COMMERCE") {
     return isValidationReadyAccount(account)
-      ? "?? ?? ?? ??"
-      : `??: ${missingFields.join(", ")}`;
+      ? "검증 전용 점검 가능"
+      : `누락: ${missingFields.join(", ")}`;
   }
 
   return isValidationReadyAccount(account)
-    ? "?? ?? ??"
-    : `??: ${missingFields.join(", ")}`;
+    ? "기본 검증 가능"
+    : `누락: ${missingFields.join(", ")}`;
 }
 
 function getAccountMissingFields(account: ApiAccount) {
   const missingFields: string[] = [];
 
   if (!account.clientIdMasked) {
-    missingFields.push("????? ID");
+    missingFields.push("클라이언트 ID");
   }
 
   if (!account.clientSecretMasked) {
-    missingFields.push("????? ???");
+    missingFields.push("클라이언트 시크릿");
   }
 
   if (account.type === "SEARCH_AD") {
     if (!account.accessLicenseMasked) {
-      missingFields.push("??? ????");
+      missingFields.push("액세스 라이선스");
     }
     if (!account.secretKeyMasked) {
-      missingFields.push("??? ?");
+      missingFields.push("시크릿 키");
     }
     if (!account.customerId) {
-      missingFields.push("?? ID");
+      missingFields.push("고객 ID");
     }
   }
 
   if (account.type === "COMMERCE") {
     if (!account.accessLicenseMasked) {
-      missingFields.push("??? ????");
+      missingFields.push("액세스 라이선스");
     }
     if (!account.secretKeyMasked) {
-      missingFields.push("??? ?");
+      missingFields.push("시크릿 키");
     }
     if (!account.storeId && !account.channelId) {
-      missingFields.push("??? ID ?? ?? ID");
+      missingFields.push("스토어 ID 또는 채널 ID");
     }
   }
 
@@ -1424,24 +1424,24 @@ function buildAccountReadinessSummary(accounts: ApiAccount[], recentLogCount: nu
 
   return [
     {
-      label: "??? ??",
+      label: "저장된 계정",
       value: accounts.length,
-      caption: `?? ${activeCount}?`
+      caption: `활성 ${activeCount}개`
     },
     {
-      label: "???? ??",
+      label: "실테스트 가능",
       value: liveReadyCount,
-      caption: "SEARCH_AD ???? ?? ??"
+      caption: "SEARCH_AD 자격정보 입력 완료"
     },
     {
-      label: "?? ??",
+      label: "검증 가능",
       value: validationReadyCount,
-      caption: "???? ?? ??"
+      caption: "비실연동 점검 가능"
     },
     {
-      label: "?? ???",
+      label: "최근 테스트",
       value: recentLogCount,
-      caption: "?? ?? ?? ??"
+      caption: "최신 연결 로그 기준"
     }
   ];
 }
@@ -1454,30 +1454,30 @@ function buildAccountLogFocusCards(logs: AccountTestLogViewRow[]): AccountLogFoc
 
   return [
     {
-      label: "?? ??",
+      label: "검증 가능",
       value: failedCount,
-      caption: failedCount > 0 ? "???? ?? ?? ??? ?? ?????" : "?? ?? ??? ?? ??? ????.",
+      caption: failedCount > 0 ? "자격정보 또는 연결 오류를 먼저 확인하세요." : "최근 로그 구간에 실패 내역이 없습니다.",
       toneClass: "failed",
       filterValue: "FAILED"
     },
     {
-      label: "?? ??",
+      label: "검증 가능",
       value: successCount,
-      caption: successCount > 0 ? "?? ?? ??? ?? ???????." : "?? ?? ?? ?? ??? ????.",
+      caption: successCount > 0 ? "최근 연결 점검이 정상 완료되었습니다." : "아직 최근 성공 점검 기록이 없습니다.",
       toneClass: "success",
       filterValue: "SUCCESS"
     },
     {
-      label: "??? ??",
+      label: "저장된 계정",
       value: realCount,
-      caption: realCount > 0 ? "?? ???? ??? ???????." : "?? ?? ??? ??? ???? ????.",
+      caption: realCount > 0 ? "실제 검색광고 점검이 실행되었습니다." : "최근 로그 구간에 실연동 테스트가 없습니다.",
       toneClass: "info",
       filterValue: "REAL"
     },
     {
-      label: "?? ??",
+      label: "검증 가능",
       value: validationCount,
-      caption: "?? ???? ?? ? ????? ?????.",
+      caption: "운영 자격정보 적용 전 검증용으로 활용됩니다.",
       toneClass: "warning",
       filterValue: "VALIDATION"
     }
@@ -1526,9 +1526,9 @@ function parseApiAccountTestMeta(metaJson?: string | null): ParsedApiAccountTest
 
 function formatParsedApiAccountTestMeta(parsed: ParsedApiAccountTestMeta, fallback?: string | null) {
   const parts = [
-    parsed.accountType ? `??=${parsed.accountType}` : "",
-    parsed.mode ? `??=${parsed.mode}` : "",
-    typeof parsed.statusCode === "number" ? `??=${parsed.statusCode}` : "",
+    parsed.accountType ? `유형=${parsed.accountType}` : "",
+    parsed.mode ? `모드=${parsed.mode}` : "",
+    typeof parsed.statusCode === "number" ? `상태=${parsed.statusCode}` : "",
     parsed.details ? String(parsed.details).slice(0, 120) : ""
   ].filter(Boolean);
 

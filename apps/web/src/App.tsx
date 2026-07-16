@@ -982,7 +982,7 @@ function ReportsView({ snapshot }: { snapshot: AppSnapshot }) {
             </select>
           </label>
           <label>
-            <span>상태</span>
+            <span>판단</span>
             <select value={judgementFilter} onChange={(event) => setJudgementFilter(event.target.value)}>
               <option value="ALL">전체</option>
               <option value="EFFECTIVE">EFFECTIVE</option>
@@ -1030,13 +1030,13 @@ function ReportsView({ snapshot }: { snapshot: AppSnapshot }) {
               { key: "productTitle", title: "상품", width: 260 },
               {
                 key: "status",
-                title: "상세",
+                title: "상태",
                 width: 120,
                 render: (row) => <StatusBadge value={row.status} />
               },
               {
                 key: "judgement",
-                title: "상세",
+                title: "판단",
                 width: 120,
                 render: (row) => <StatusBadge value={row.judgement} />
               },

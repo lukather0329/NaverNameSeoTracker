@@ -33,6 +33,12 @@ type AccountReadinessSummary = {
   value: number;
   caption: string;
 };
+type AccountLogFocusCard = {
+  label: string;
+  value: number;
+  caption: string;
+  toneClass: string;
+};
 type AccountReadinessState = "LIVE_READY" | "VALIDATION_READY" | "INCOMPLETE";
 type AccountFilterValue = "ALL" | AccountReadinessState;
 type AccountLogFilterValue = "ALL" | "FAILED" | "SUCCESS" | "REAL" | "VALIDATION";
@@ -317,6 +323,7 @@ function ApiAccountsView({
       };
     });
   const readinessSummary = buildAccountReadinessSummary(accounts, recentAccountTestLogs.length);
+  const logFocusCards = buildAccountLogFocusCards(recentAccountTestLogs);
   const filteredAccounts = accounts.filter((account) => {
     const readiness = getAccountReadinessState(account);
     const readinessMatch = accountFilter === "ALL" || readiness === accountFilter;
@@ -421,6 +428,15 @@ function ApiAccountsView({
           <div className="card-grid account-summary-grid">
             {readinessSummary.map((item) => (
               <article key={item.label} className="metric-card panel tone-card compact-card">
+                <span>{item.label}</span>
+                <strong>{item.value}</strong>
+                <small>{item.caption}</small>
+              </article>
+            ))}
+          </div>
+          <div className="card-grid account-focus-grid">
+            {logFocusCards.map((item) => (
+              <article key={item.label} className={`metric-card panel compact-card focus-card ${item.toneClass}`}>
                 <span>{item.label}</span>
                 <strong>{item.value}</strong>
                 <small>{item.caption}</small>
@@ -1407,6 +1423,40 @@ function buildAccountReadinessSummary(accounts: ApiAccount[], recentLogCount: nu
       label: "Recent Tests",
       value: recentLogCount,
       caption: "Latest connection log rows"
+    }
+  ];
+}
+
+function buildAccountLogFocusCards(logs: AccountTestLogViewRow[]): AccountLogFocusCard[] {
+  const failedCount = logs.filter((row) => row.outcome === "FAILED").length;
+  const successCount = logs.filter((row) => row.outcome === "SUCCESS").length;
+  const realCount = logs.filter((row) => row.testMode === "REAL").length;
+  const validationCount = logs.filter((row) => row.testMode === "VALIDATION").length;
+
+  return [
+    {
+      label: "Recent Failed",
+      value: failedCount,
+      caption: failedCount > 0 ? "Review credentials or connection errors first" : "No recent failures in the latest log window",
+      toneClass: "failed"
+    },
+    {
+      label: "Recent Success",
+      value: successCount,
+      caption: successCount > 0 ? "Healthy connection checks completed recently" : "No recent successful checks recorded yet",
+      toneClass: "success"
+    },
+    {
+      label: "Real Mode",
+      value: realCount,
+      caption: realCount > 0 ? "Live SearchAd checks were executed" : "No live external test in the recent log window",
+      toneClass: "info"
+    },
+    {
+      label: "Validation Mode",
+      value: validationCount,
+      caption: "Non-live checks useful before production credentials",
+      toneClass: "warning"
     }
   ];
 }

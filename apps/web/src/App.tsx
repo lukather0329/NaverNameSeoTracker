@@ -39,6 +39,10 @@ type FormReadinessPreview = {
   missingFields: string[];
 };
 type FormFieldState = "required" | "optional";
+type NextActionGuide = {
+  title: string;
+  description: string;
+};
 type ExperimentReportRow = {
   id: string;
   name: string;
@@ -286,6 +290,7 @@ function ApiAccountsView({
   const canSaveAccount = formReadiness.state !== "INCOMPLETE";
   const currentRequiredFields = getCurrentRequiredFields(form.type);
   const requiredFieldSet = new Set(currentRequiredFields);
+  const nextActionGuide = buildNextActionGuide(accounts, formReadiness, form.type);
   const needsAdvancedCredentials = form.type !== "CUSTOM";
   const needsCustomerId = form.type === "SEARCH_AD";
   const needsCommerceTargets = form.type === "COMMERCE";
@@ -355,6 +360,11 @@ function ApiAccountsView({
             ))}
           </div>
         </div>
+      </div>
+      <div className="next-action-card">
+        <p className="eyebrow">Next Action</p>
+        <strong>{nextActionGuide.title}</strong>
+        <p>{nextActionGuide.description}</p>
       </div>
       <div className="form-checklist-card">
         <div className="section-heading">
@@ -1019,6 +1029,36 @@ function downloadCsv(fileName: string, csvText: string) {
   anchor.download = fileName;
   anchor.click();
   URL.revokeObjectURL(url);
+}
+
+function buildNextActionGuide(accounts: ApiAccount[], formReadiness: FormReadinessPreview, currentType: ApiAccountFormInput["type"]): NextActionGuide {
+  const liveReadyAccounts = accounts.filter((account) => getAccountReadinessState(account) === "LIVE_READY");
+
+  if (liveReadyAccounts.length > 0) {
+    return {
+      title: "Run a live SearchAd connection test.",
+      description: `At least ${liveReadyAccounts.length} saved account is ready for a real external test. Use Run Live Test from the table below.`
+    };
+  }
+
+  if (formReadiness.state === "LIVE_READY") {
+    return {
+      title: "Save this account, then run a live test.",
+      description: "The current SEARCH_AD form is complete enough for an immediate real connection check."
+    };
+  }
+
+  if (formReadiness.state === "VALIDATION_READY") {
+    return {
+      title: "Save this account for the current validation flow.",
+      description: currentType === "COMMERCE" ? "Commerce accounts can be stored now and validated, then upgraded to live adapter testing later." : "This account is ready for the current non-live validation path."
+    };
+  }
+
+  return {
+    title: "Complete the highlighted required fields first.",
+    description: `The form still needs ${formReadiness.missingFields.length} required field${formReadiness.missingFields.length === 1 ? "" : "s"} before save and test can continue.`
+  };
 }
 
 function getFormFieldClassName(requiredFieldSet: Set<string>, requirementKey: string, fallbackKey?: string) {

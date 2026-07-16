@@ -20,6 +20,11 @@ const apiAccountSchema = z.object({
   isActive: z.boolean().default(true)
 });
 
+const apiAccountUpdateSchema = apiAccountSchema.partial().extend({
+  name: z.string().min(1).optional(),
+  type: z.enum(["COMMERCE", "SEARCH_AD", "CUSTOM"]).optional()
+});
+
 const productSchema = z.object({
   smartStoreProductId: z.string().min(1),
   originProductId: z.string().optional(),
@@ -113,6 +118,52 @@ router.post("/accounts", async (req, res) => {
   });
 
   res.status(201).json(account);
+});
+
+router.put("/accounts/:id", async (req, res) => {
+  const input = apiAccountUpdateSchema.parse(req.body);
+  const account = await prisma.apiAccount.update({
+    where: { id: req.params.id },
+    data: input
+  });
+
+  res.json(account);
+});
+
+router.post("/accounts/:id/test", async (req, res) => {
+  const account = await prisma.apiAccount.findUnique({
+    where: { id: req.params.id }
+  });
+
+  if (!account) {
+    res.status(404).json({ ok: false, message: "Account not found" });
+    return;
+  }
+
+  const hasBaseCredentials = Boolean(account.clientId && account.clientSecret);
+  const hasExtendedCredentials =
+    account.type !== "COMMERCE" ||
+    Boolean(account.accessLicense && account.secretKey && (account.storeId || account.channelId));
+
+  const isConnected = hasBaseCredentials && hasExtendedCredentials;
+  const connectionStatus = isConnected ? "CONNECTED" : "FAILED";
+
+  const updated = await prisma.apiAccount.update({
+    where: { id: account.id },
+    data: {
+      connectionStatus,
+      lastCheckedAt: new Date()
+    }
+  });
+
+  res.json({
+    ok: isConnected,
+    mode: "validation",
+    message: isConnected
+      ? "필수 인증 항목 검증을 통과했습니다. 실외부호출 테스트는 후속 어댑터 연결이 필요합니다."
+      : "필수 인증 정보가 부족해 연결 테스트에 실패했습니다.",
+    account: updated
+  });
 });
 
 router.post("/products", async (req, res) => {

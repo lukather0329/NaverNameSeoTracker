@@ -706,8 +706,8 @@ function ApiAccountsView({
         </div>
         {recentAccountTestLogs.length === 0 ? (
           <div className="empty-state-card">
-            <strong>No account test logs yet.</strong>
-            <p>Run a connection test to populate the latest API account history.</p>
+            <strong>아직 API 계정 테스트 로그가 없습니다.</strong>
+            <p>연결 테스트를 실행하면 최신 API 계정 이력이 여기에 표시됩니다.</p>
           </div>
         ) : (
           <DataGrid

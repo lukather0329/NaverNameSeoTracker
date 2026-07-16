@@ -32,6 +32,7 @@ type AccountReadinessSummary = {
   caption: string;
 };
 type AccountReadinessState = "LIVE_READY" | "VALIDATION_READY" | "INCOMPLETE";
+type AccountFilterValue = "ALL" | AccountReadinessState;
 type FormReadinessPreview = {
   state: AccountReadinessState;
   title: string;
@@ -295,6 +296,8 @@ function ApiAccountsView({
   const [form, setForm] = useState<ApiAccountFormInput>(defaultApiAccountForm);
   const [submitting, setSubmitting] = useState(false);
   const [feedback, setFeedback] = useState<FeedbackState | null>(null);
+  const [accountFilter, setAccountFilter] = useState<AccountFilterValue>("ALL");
+  const [activeOnly, setActiveOnly] = useState(false);
   const accountGuide = accountTypeGuides[form.type];
   const saveTimingGuide = accountSaveTimingGuides[form.type];
   const recentAccountTestLogs: AccountTestLogViewRow[] = (systemLogs ?? [])
@@ -305,12 +308,24 @@ function ApiAccountsView({
       detailSummary: formatApiAccountTestMeta(row.metaJson)
     }));
   const readinessSummary = buildAccountReadinessSummary(accounts, recentAccountTestLogs.length);
+  const filteredAccounts = accounts.filter((account) => {
+    const readiness = getAccountReadinessState(account);
+    const readinessMatch = accountFilter === "ALL" || readiness === accountFilter;
+    const activeMatch = !activeOnly || account.isActive;
+    return readinessMatch && activeMatch;
+  });
   const formReadiness = buildFormReadinessPreview(form);
   const canSaveAccount = formReadiness.state !== "INCOMPLETE";
   const currentRequiredFields = getCurrentRequiredFields(form.type);
   const requiredFieldSet = new Set(currentRequiredFields);
   const nextActionGuide = buildNextActionGuide(accounts, formReadiness, form.type);
   const fieldHints = buildFieldHints(form.type);
+  const accountFilterOptions: Array<{ value: AccountFilterValue; label: string }> = [
+    { value: "ALL", label: `All (${accounts.length})` },
+    { value: "LIVE_READY", label: `Live Ready (${accounts.filter((account) => getAccountReadinessState(account) === "LIVE_READY").length})` },
+    { value: "VALIDATION_READY", label: `Validation Ready (${accounts.filter((account) => getAccountReadinessState(account) === "VALIDATION_READY").length})` },
+    { value: "INCOMPLETE", label: `Incomplete (${accounts.filter((account) => getAccountReadinessState(account) === "INCOMPLETE").length})` }
+  ];
   const needsAdvancedCredentials = form.type !== "CUSTOM";
   const needsCustomerId = form.type === "SEARCH_AD";
   const needsCommerceTargets = form.type === "COMMERCE";
@@ -516,6 +531,27 @@ function ApiAccountsView({
         )}
       </div>
       {feedback && <div className={`feedback-banner ${feedback.tone}`}>{feedback.message}</div>}
+      <div className="account-filter-bar">
+        <div className="account-filter-chip-row">
+          {accountFilterOptions.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              className={option.value === accountFilter ? "filter-chip active" : "filter-chip"}
+              onClick={() => setAccountFilter(option.value)}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+        <label className="filter-toggle">
+          <input type="checkbox" checked={activeOnly} onChange={(event) => setActiveOnly(event.target.checked)} />
+          <span>Active only</span>
+        </label>
+      </div>
+      <div className="account-filter-summary">
+        <strong>{filteredAccounts.length}</strong> of {accounts.length} accounts shown
+      </div>
       <DataGrid
         columns={[
           { key: "name", title: "Account", width: 180, sticky: true },
@@ -582,7 +618,7 @@ function ApiAccountsView({
             }
           }
         ]}
-        rows={accounts}
+        rows={filteredAccounts}
       />
       <div className="log-panel">
         <div className="section-heading">

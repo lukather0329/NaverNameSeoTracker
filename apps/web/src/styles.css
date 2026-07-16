@@ -575,6 +575,62 @@ select {
   background: linear-gradient(180deg, rgba(245, 248, 255, 0.98), rgba(233, 240, 255, 0.98));
 }
 
+.account-filter-bar {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.account-filter-chip-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.filter-chip {
+  border: 1px solid rgba(224, 229, 250, 0.96);
+  background: rgba(255, 255, 255, 0.96);
+  color: var(--text-soft);
+  border-radius: 999px;
+  padding: 10px 14px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.filter-chip.active {
+  border-color: rgba(67, 24, 255, 0.2);
+  background: linear-gradient(180deg, rgba(245, 248, 255, 0.98), rgba(234, 240, 255, 0.98));
+  color: #4318ff;
+  box-shadow: 0 12px 24px rgba(67, 24, 255, 0.08);
+}
+
+.filter-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.filter-toggle input {
+  width: 16px;
+  height: 16px;
+}
+
+.account-filter-summary {
+  color: var(--text-soft);
+  font-size: 14px;
+}
+
+.account-filter-summary strong {
+  color: var(--text-main);
+}
+
 .next-action-card,
 .form-checklist-card,
 .form-readiness-card {

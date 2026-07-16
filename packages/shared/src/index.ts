@@ -1,4 +1,4 @@
-﻿export type ApiAccountType = "COMMERCE" | "SEARCH_AD" | "CUSTOM";
+export type ApiAccountType = "COMMERCE" | "SEARCH_AD" | "CUSTOM";
 export type ConnectionStatus = "CONNECTED" | "FAILED" | "UNVERIFIED" | "EXPIRED";
 export type ProductStatus = "ON_SALE" | "PAUSED" | "SOLD_OUT";
 export type TestStatus = "DRAFT" | "RUNNING" | "PAUSED" | "COMPLETED" | "FAILED";
@@ -144,6 +144,16 @@ export interface DashboardSummary {
   last24hPoints: Array<{ label: string; up: number; down: number; same: number }>;
 }
 
+export interface SystemLogEntry {
+  id: string;
+  level: string;
+  scope: string;
+  message: string;
+  metaJson?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface AppSnapshot {
   dashboard: DashboardSummary;
   apiAccounts: ApiAccount[];
@@ -153,4 +163,5 @@ export interface AppSnapshot {
   experiments: SeoExperiment[];
   jobs: RankTrackingJob[];
   results: RankTrackingResult[];
+  systemLogs: SystemLogEntry[];
 }

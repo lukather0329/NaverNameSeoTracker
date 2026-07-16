@@ -7,7 +7,8 @@ import type {
   Product,
   RankTrackingJob,
   RankTrackingResult,
-  SeoExperiment
+  SeoExperiment,
+  SystemLogEntry
 } from "@naver-seo-tracker/shared";
 import { DataGrid } from "./components/DataGrid";
 import { SparklineBars } from "./components/SparklineBars";
@@ -157,6 +158,7 @@ export function App() {
             {view === "accounts" && (
               <ApiAccountsView
                 accounts={snapshot.apiAccounts}
+                systemLogs={snapshot.systemLogs}
                 onCreateAccount={handleCreateApiAccount}
                 onTestAccount={handleTestApiAccount}
                 onToggleAccount={handleToggleApiAccount}
@@ -210,11 +212,13 @@ function DashboardView({ snapshot }: { snapshot: AppSnapshot }) {
 
 function ApiAccountsView({
   accounts,
+  systemLogs,
   onCreateAccount,
   onTestAccount,
   onToggleAccount
 }: {
   accounts: ApiAccount[];
+  systemLogs: SystemLogEntry[];
   onCreateAccount: (input: ApiAccountFormInput) => Promise<void>;
   onTestAccount: (accountId: string) => Promise<{ ok: boolean; message: string; mode?: string; statusCode?: number; details?: string }>;
   onToggleAccount: (account: ApiAccount) => Promise<void>;
@@ -381,6 +385,34 @@ function ApiAccountsView({
         ]}
         rows={accounts}
       />
+      <div className="log-panel">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">Test History</p>
+            <h3>최근 API 계정 테스트 로그</h3>
+          </div>
+        </div>
+        <DataGrid
+          columns={[
+            {
+              key: "createdAt",
+              title: "시각",
+              width: 180,
+              sticky: true,
+              render: (row) => formatDateTime(row.createdAt)
+            },
+            { key: "level", title: "Level", width: 100, render: (row) => <StatusBadge value={row.level} /> },
+            { key: "message", title: "메시지", width: 420 },
+            {
+              key: "metaJson",
+              title: "상세",
+              width: 360,
+              render: (row) => row.metaJson ?? "-"
+            }
+          ]}
+          rows={systemLogs.filter((row) => row.scope === "api-account-test")}
+        />
+      </div>
     </section>
   );
 }

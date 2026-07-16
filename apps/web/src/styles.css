@@ -396,3 +396,8 @@ button {
     padding: 18px;
   }
 }
+
+.log-panel {
+  display: grid;
+  gap: 12px;
+}

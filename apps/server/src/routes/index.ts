@@ -65,7 +65,7 @@ router.get("/health", (_req, res) => {
 });
 
 router.get("/snapshot", async (_req, res) => {
-  const [dashboard, apiAccounts, products, seoTitleCandidates, titleChangeLogs, experiments, jobs, results] =
+  const [dashboard, apiAccounts, products, seoTitleCandidates, titleChangeLogs, experiments, jobs, results, systemLogs] =
     await Promise.all([
       getDashboardSummary(),
       prisma.apiAccount.findMany({ orderBy: { createdAt: "desc" } }),
@@ -74,7 +74,8 @@ router.get("/snapshot", async (_req, res) => {
       prisma.titleChangeLog.findMany({ orderBy: { createdAt: "desc" } }),
       prisma.seoExperiment.findMany({ orderBy: { createdAt: "desc" } }),
       prisma.rankTrackingJob.findMany({ orderBy: { createdAt: "desc" } }),
-      prisma.rankTrackingResult.findMany({ orderBy: { trackedAt: "desc" }, take: 100 })
+      prisma.rankTrackingResult.findMany({ orderBy: { trackedAt: "desc" }, take: 100 }),
+      prisma.systemLog.findMany({ orderBy: { createdAt: "desc" }, take: 20 })
     ]);
 
   res.json({
@@ -148,6 +149,21 @@ router.post("/accounts/:id/test", async (req, res) => {
     data: {
       connectionStatus,
       lastCheckedAt: new Date()
+    }
+  });
+
+  await prisma.systemLog.create({
+    data: {
+      level: result.ok ? "INFO" : "ERROR",
+      scope: "api-account-test",
+      message: `${account.name} (${account.type}) connection test ${result.ok ? "succeeded" : "failed"}`,
+      metaJson: JSON.stringify({
+        accountId: account.id,
+        accountType: account.type,
+        mode: result.mode,
+        statusCode: result.statusCode ?? null,
+        details: result.details ?? null
+      })
     }
   });
 

@@ -1,4 +1,4 @@
-﻿import type { FormEvent } from "react";
+import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
 import type {
   ApiAccount,
@@ -310,6 +310,7 @@ function ApiAccountsView({
   const [accountFilter, setAccountFilter] = useState<AccountFilterValue>("ALL");
   const [activeOnly, setActiveOnly] = useState(false);
   const [logFilter, setLogFilter] = useState<AccountLogFilterValue>("ALL");
+  const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
   const accountGuide = accountTypeGuides[form.type];
   const saveTimingGuide = accountSaveTimingGuides[form.type];
   const recentAccountTestLogs: AccountTestLogViewRow[] = (systemLogs ?? [])
@@ -327,14 +328,16 @@ function ApiAccountsView({
     });
   const readinessSummary = buildAccountReadinessSummary(accounts, recentAccountTestLogs.length);
   const logFocusCards = buildAccountLogFocusCards(recentAccountTestLogs);
+  const selectedAccount = accounts.find((account) => account.id === selectedAccountId) ?? null;
   const filteredLogRows = recentAccountTestLogs.filter((row) => {
-    if (logFilter === "ALL") {
-      return true;
-    }
-    if (logFilter === "FAILED" || logFilter === "SUCCESS") {
-      return row.outcome === logFilter;
-    }
-    return row.testMode === logFilter;
+    const logFilterMatch =
+      logFilter === "ALL"
+        ? true
+        : logFilter === "FAILED" || logFilter === "SUCCESS"
+          ? row.outcome === logFilter
+          : row.testMode === logFilter;
+    const selectedAccountMatch = !selectedAccountId || row.accountId === selectedAccountId;
+    return logFilterMatch && selectedAccountMatch;
   });
   const linkedAccountIds = new Set(filteredLogRows.map((row) => row.accountId).filter((value): value is string => Boolean(value)));
   const shouldLinkAccountsToLogs = logFilter !== "ALL";
@@ -348,6 +351,7 @@ function ApiAccountsView({
   const accountScopeSummary = shouldLinkAccountsToLogs
     ? `필터된 로그 ${filteredLogRows.length}건과 연결됨`
     : null;
+  const logScopeSummary = selectedAccount ? `${selectedAccount.name} 계정 로그만 표시 중` : null;
   const formReadiness = buildFormReadinessPreview(form);
   const canSaveAccount = formReadiness.state !== "INCOMPLETE";
   const currentRequiredFields = getCurrentRequiredFields(form.type);
@@ -611,6 +615,11 @@ function ApiAccountsView({
       <div className="account-filter-summary">
         <strong>{filteredAccounts.length}</strong> / {accounts.length}개 계정 표시 중
         {accountScopeSummary && <span className="account-scope-note">{accountScopeSummary}</span>}
+        {selectedAccount && (
+          <button type="button" className="inline-link-button" onClick={() => setSelectedAccountId(null)}>
+            선택 계정 해제
+          </button>
+        )}
       </div>
       <DataGrid
         columns={[
@@ -670,6 +679,13 @@ function ApiAccountsView({
                   >
                     {testLabel}
                   </button>
+                  <button
+                    type="button"
+                    className="action-button secondary"
+                    onClick={() => setSelectedAccountId(selectedAccountId === row.id ? null : row.id)}
+                  >
+                    {selectedAccountId === row.id ? "로그 전체" : "로그 보기"}
+                  </button>
                   <button type="button" className="action-button secondary" onClick={() => void onToggleAccount(row)}>
                     {row.isActive ? "비활성화" : "활성화"}
                   </button>
@@ -702,6 +718,7 @@ function ApiAccountsView({
           </div>
           <div className="account-filter-summary">
             <strong>{filteredLogRows.length}</strong> / {recentAccountTestLogs.length}개 로그 표시 중
+            {logScopeSummary && <span className="account-scope-note">{logScopeSummary}</span>}
           </div>
         </div>
         {recentAccountTestLogs.length === 0 ? (

@@ -981,3 +981,11 @@ select {
   margin: 0;
   color: var(--text-soft);
 }
+.inline-link-button {
+  border: 0;
+  background: transparent;
+  color: #4318ff;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+}

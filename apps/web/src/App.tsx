@@ -282,11 +282,18 @@ function ApiAccountsView({
     }));
   const readinessSummary = buildAccountReadinessSummary(accounts, recentAccountTestLogs.length);
   const formReadiness = buildFormReadinessPreview(form);
+  const canSaveAccount = formReadiness.state !== "INCOMPLETE";
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setSubmitting(true);
     setFeedback(null);
+
+    if (!canSaveAccount) {
+      setFeedback(`Complete the required fields first: ${formReadiness.missingFields.join(", ")}`);
+      return;
+    }
+
+    setSubmitting(true);
 
     try {
       await onCreateAccount(form);
@@ -391,8 +398,13 @@ function ApiAccountsView({
           <input type="checkbox" checked={form.isActive} onChange={(event) => setForm({ ...form, isActive: event.target.checked })} />
           <span>Active</span>
         </label>
-        <button type="submit" className="action-button" disabled={submitting}>
-          {submitting ? "Saving..." : "Save Account"}
+        <button
+          type="submit"
+          className="action-button"
+          disabled={submitting || !canSaveAccount}
+          title={canSaveAccount ? "Save account" : formReadiness.missingFields.join(", ")}
+        >
+          {submitting ? "Saving..." : canSaveAccount ? "Save Account" : "Fill Required Fields"}
         </button>
       </form>
       <div className="form-readiness-card">

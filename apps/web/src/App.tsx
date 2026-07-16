@@ -162,7 +162,7 @@ export function App() {
             {view === "accounts" && (
               <ApiAccountsView
                 accounts={snapshot.apiAccounts}
-                systemLogs={snapshot.systemLogs}
+                systemLogs={snapshot.systemLogs ?? []}
                 onCreateAccount={handleCreateApiAccount}
                 onTestAccount={handleTestApiAccount}
                 onToggleAccount={handleToggleApiAccount}
@@ -231,7 +231,7 @@ function ApiAccountsView({
   const [submitting, setSubmitting] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
   const accountGuide = accountTypeGuides[form.type];
-  const recentAccountTestLogs: AccountTestLogViewRow[] = systemLogs
+  const recentAccountTestLogs: AccountTestLogViewRow[] = (systemLogs ?? [])
     .filter((row) => row.scope === "api-account-test")
     .slice(0, 8)
     .map((row) => ({

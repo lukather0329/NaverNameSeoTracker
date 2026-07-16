@@ -1,3 +1,4 @@
+﻿import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
@@ -5,18 +6,24 @@ const prisma = new PrismaClient();
 async function main() {
   const product = await prisma.product.upsert({
     where: { smartStoreProductId: "SS-10001" },
-    update: {},
+    update: {
+      currentTitle: "Naver SEO Test Premium Tumbler 900ml",
+      seoOptimizedTitle: "Naver SEO Test Premium Tumbler 900ml Large Capacity Insulated Bottle",
+      primaryKeyword: "insulated tumbler",
+      trackingKeywords: "insulated tumbler,large tumbler,stainless tumbler",
+      testStatus: "RUNNING"
+    },
     create: {
       smartStoreProductId: "SS-10001",
       originProductId: "ORG-90001",
       channelProductId: "CH-10001",
       sellerManagementCode: "SELLER-SEO-01",
-      currentTitle: "네이버 SEO 테스트용 프리미엄 텀블러 900ml",
-      originalTitle: "프리미엄 텀블러 900ml",
-      seoOptimizedTitle: "네이버 SEO 테스트용 프리미엄 텀블러 900ml 대용량 보온 보냉",
-      primaryKeyword: "대용량 텀블러",
-      trackingKeywords: "대용량 텀블러,보온 텀블러,사무실 텀블러",
-      category: "주방용품",
+      currentTitle: "Naver SEO Test Premium Tumbler 900ml",
+      originalTitle: "Premium Tumbler 900ml",
+      seoOptimizedTitle: "Naver SEO Test Premium Tumbler 900ml Large Capacity Insulated Bottle",
+      primaryKeyword: "insulated tumbler",
+      trackingKeywords: "insulated tumbler,large tumbler,stainless tumbler",
+      category: "Kitchen",
       price: 25900,
       productStatus: "ON_SALE",
       testStatus: "RUNNING"
@@ -25,10 +32,12 @@ async function main() {
 
   await prisma.apiAccount.upsert({
     where: { id: "seed-api-account-1" },
-    update: {},
+    update: {
+      connectionStatus: "CONNECTED"
+    },
     create: {
       id: "seed-api-account-1",
-      name: "메인 스마트스토어 계정",
+      name: "Main Smartstore Account",
       type: "COMMERCE",
       clientId: "naver-client-id-1234",
       clientSecret: "naver-client-secret-1234",
@@ -41,20 +50,27 @@ async function main() {
     }
   });
 
+  await prisma.seoTitleCandidate.deleteMany({ where: { productId: product.id } });
+  await prisma.titleChangeLog.deleteMany({ where: { productId: product.id } });
+  await prisma.rankTrackingResult.deleteMany({ where: { productId: product.id } });
+  await prisma.rankTrackingJob.deleteMany({ where: { productId: product.id } });
+  await prisma.experimentKeyword.deleteMany({ where: { experiment: { productId: product.id } } });
+  await prisma.seoExperiment.deleteMany({ where: { productId: product.id } });
+
   await prisma.seoTitleCandidate.create({
     data: {
       productId: product.id,
       source: "MVP_ADAPTER",
-      title: "네이버 SEO 테스트용 프리미엄 텀블러 900ml 대용량 보온 보냉",
-      notes: "기존 MVP 생성안"
+      title: "Naver SEO Test Premium Tumbler 900ml Large Capacity Insulated Bottle",
+      notes: "Seeded sample title candidate"
     }
   });
 
   await prisma.titleChangeLog.create({
     data: {
       productId: product.id,
-      beforeTitle: "프리미엄 텀블러 900ml",
-      afterTitle: "네이버 SEO 테스트용 프리미엄 텀블러 900ml 대용량 보온 보냉",
+      beforeTitle: "Premium Tumbler 900ml",
+      afterTitle: "Naver SEO Test Premium Tumbler 900ml Large Capacity Insulated Bottle",
       appliedAt: new Date(),
       mode: "VALIDATION",
       result: "SUCCESS"
@@ -63,26 +79,26 @@ async function main() {
 
   const experiment = await prisma.seoExperiment.create({
     data: {
-      name: "텀블러 상품명 SEO 검증 1차",
+      name: "Tumbler SEO Test Round 1",
       productId: product.id,
-      beforeTitle: "프리미엄 텀블러 900ml",
-      afterTitle: "네이버 SEO 테스트용 프리미엄 텀블러 900ml 대용량 보온 보냉",
+      beforeTitle: "Premium Tumbler 900ml",
+      afterTitle: "Naver SEO Test Premium Tumbler 900ml Large Capacity Insulated Bottle",
       appliedAt: new Date(),
       trackingInterval: "30_MINUTES",
       startDate: new Date(),
       status: "RUNNING",
-      summary: "초기 실험 진행 중",
+      summary: "Initial seeded experiment",
       judgement: "PENDING",
       minObservationHours: 24,
-      notes: "광고 집행 없음 / 가격 변동 없음"
+      notes: "No price change / No ads running"
     }
   });
 
   await prisma.experimentKeyword.createMany({
     data: [
-      { experimentId: experiment.id, keyword: "대용량 텀블러", isPrimary: true },
-      { experimentId: experiment.id, keyword: "보온 텀블러", isPrimary: false },
-      { experimentId: experiment.id, keyword: "사무실 텀블러", isPrimary: false }
+      { experimentId: experiment.id, keyword: "insulated tumbler", isPrimary: true },
+      { experimentId: experiment.id, keyword: "large tumbler", isPrimary: false },
+      { experimentId: experiment.id, keyword: "stainless tumbler", isPrimary: false }
     ]
   });
 
@@ -90,7 +106,7 @@ async function main() {
     data: {
       experimentId: experiment.id,
       productId: product.id,
-      keyword: "대용량 텀블러",
+      keyword: "insulated tumbler",
       interval: "30_MINUTES",
       provider: "MOCK",
       isEnabled: true,
@@ -103,7 +119,7 @@ async function main() {
       jobId: job.id,
       experimentId: experiment.id,
       productId: product.id,
-      keyword: "대용량 텀블러",
+      keyword: "insulated tumbler",
       trackedAt: new Date(),
       currentRank: 7,
       previousRank: 11,

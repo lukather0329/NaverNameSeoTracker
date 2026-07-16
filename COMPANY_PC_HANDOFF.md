@@ -24,6 +24,7 @@ Current focus branch: `feature/reports`
   - added report screen, summary cards, experiment report table, CSV export flow
   - workspace build verified on 2026-07-16 with `npm run build`
   - local API health and snapshot verified after dotenv/prisma bootstrap fix on 2026-07-16
+  - sample seed data restored and snapshot data verified on 2026-07-16
 
 ## 2. First steps on company PC
 
@@ -44,20 +45,23 @@ git pull origin feature/reports
 - shared/package/server/web TypeScript build blockers fixed
 - Vite env typing and workspace build scripts aligned
 - server dotenv load order fixed so Prisma reads `DATABASE_URL` during runtime
+- `prisma/seed.ts` repaired to provide stable sample report data
 
 ## 4. Recommended next work order
 
 1. Verify `feature/reports` UI rendering in browser.
-2. Test both CSV downloads with real snapshot data.
-3. Seed sample data or connect real local DB data.
+2. Test both CSV downloads with seeded snapshot data.
+3. Add filters or date range controls to report view.
 4. Merge validated feature branches into `dev`.
 
 ## 5. Report branch verification checklist
 
 - run `npm run build` once and confirm success
 - create `.env` from `ENV.example` if local env file is missing
+- run `npm run prisma:generate`
+- run `npm run prisma:seed`
 - open the app and click `리포트`
-- confirm summary cards render
+- confirm summary cards render with seeded values
 - confirm experiment table data matches current snapshot
 - click `실험 리포트 CSV`
 - click `랭킹 결과 CSV`
@@ -72,6 +76,7 @@ git pull origin feature/reports
 npm install
 npm run build
 npm run prisma:generate
+npm run prisma:seed
 npm run dev
 ```
 
@@ -81,5 +86,5 @@ npm run dev
 - add experiment/product filters
 - move CSV generation to server endpoint if file volume grows
 - add management summary section for weekly reporting
-- seed representative sample data for report demo
+- keep a cleaner demo seed dataset for report verification
 - merge report view with rank-tracking improvements if needed

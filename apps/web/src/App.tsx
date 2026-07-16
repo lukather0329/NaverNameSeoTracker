@@ -24,6 +24,7 @@ import {
 type ViewKey = "dashboard" | "accounts" | "products" | "experiments" | "tracking" | "results" | "reports";
 
 type AccountTestLogViewRow = SystemLogEntry & {
+  accountId: string | null;
   detailSummary: string;
   testMode: "REAL" | "VALIDATION";
   outcome: "SUCCESS" | "FAILED";
@@ -318,6 +319,7 @@ function ApiAccountsView({
       const meta = parseApiAccountTestMeta(row.metaJson);
       return {
         ...row,
+        accountId: meta.accountId ?? null,
         detailSummary: formatParsedApiAccountTestMeta(meta, row.metaJson),
         testMode: meta.mode === "real" ? "REAL" : "VALIDATION",
         outcome: isApiAccountLogFailure(row.level) ? "FAILED" : "SUCCESS"
@@ -325,12 +327,6 @@ function ApiAccountsView({
     });
   const readinessSummary = buildAccountReadinessSummary(accounts, recentAccountTestLogs.length);
   const logFocusCards = buildAccountLogFocusCards(recentAccountTestLogs);
-  const filteredAccounts = accounts.filter((account) => {
-    const readiness = getAccountReadinessState(account);
-    const readinessMatch = accountFilter === "ALL" || readiness === accountFilter;
-    const activeMatch = !activeOnly || account.isActive;
-    return readinessMatch && activeMatch;
-  });
   const filteredLogRows = recentAccountTestLogs.filter((row) => {
     if (logFilter === "ALL") {
       return true;
@@ -340,6 +336,18 @@ function ApiAccountsView({
     }
     return row.testMode === logFilter;
   });
+  const linkedAccountIds = new Set(filteredLogRows.map((row) => row.accountId).filter((value): value is string => Boolean(value)));
+  const shouldLinkAccountsToLogs = logFilter !== "ALL";
+  const filteredAccounts = accounts.filter((account) => {
+    const readiness = getAccountReadinessState(account);
+    const readinessMatch = accountFilter === "ALL" || readiness === accountFilter;
+    const activeMatch = !activeOnly || account.isActive;
+    const logLinkedMatch = !shouldLinkAccountsToLogs || linkedAccountIds.has(account.id);
+    return readinessMatch && activeMatch && logLinkedMatch;
+  });
+  const accountScopeSummary = shouldLinkAccountsToLogs
+    ? `Linked to ${filteredLogRows.length} filtered log${filteredLogRows.length === 1 ? "" : "s"}`
+    : null;
   const formReadiness = buildFormReadinessPreview(form);
   const canSaveAccount = formReadiness.state !== "INCOMPLETE";
   const currentRequiredFields = getCurrentRequiredFields(form.type);
@@ -602,6 +610,7 @@ function ApiAccountsView({
       </div>
       <div className="account-filter-summary">
         <strong>{filteredAccounts.length}</strong> of {accounts.length} accounts shown
+        {accountScopeSummary && <span className="account-scope-note">{accountScopeSummary}</span>}
       </div>
       <DataGrid
         columns={[
@@ -1496,6 +1505,7 @@ function isValidationReadyAccount(account: ApiAccount) {
 }
 
 type ParsedApiAccountTestMeta = {
+  accountId?: string | null;
   accountType?: string | null;
   mode?: string | null;
   statusCode?: number | null;

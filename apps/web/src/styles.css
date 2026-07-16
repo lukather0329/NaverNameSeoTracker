@@ -679,6 +679,12 @@ select {
   color: var(--text-main);
 }
 
+.account-scope-note {
+  margin-left: 10px;
+  color: #4318ff;
+  font-weight: 700;
+}
+
 .next-action-card,
 .form-checklist-card,
 .form-readiness-card {

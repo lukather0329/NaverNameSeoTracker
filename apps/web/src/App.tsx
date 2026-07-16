@@ -989,21 +989,21 @@ function ReportsView({ snapshot }: { snapshot: AppSnapshot }) {
             <span>상태</span>
             <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
               <option value="ALL">전체</option>
-              <option value="DRAFT">DRAFT</option>
-              <option value="RUNNING">RUNNING</option>
-              <option value="PAUSED">PAUSED</option>
-              <option value="COMPLETED">COMPLETED</option>
-              <option value="FAILED">FAILED</option>
+              <option value="DRAFT">초안</option>
+              <option value="RUNNING">진행 중</option>
+              <option value="PAUSED">일시중지</option>
+              <option value="COMPLETED">완료</option>
+              <option value="FAILED">실패</option>
             </select>
           </label>
           <label>
             <span>판단</span>
             <select value={judgementFilter} onChange={(event) => setJudgementFilter(event.target.value)}>
               <option value="ALL">전체</option>
-              <option value="EFFECTIVE">EFFECTIVE</option>
-              <option value="LOW_EFFECT">LOW_EFFECT</option>
-              <option value="PENDING">PENDING</option>
-              <option value="WORSE">WORSE</option>
+              <option value="EFFECTIVE">효과 있음</option>
+              <option value="LOW_EFFECT">효과 낮음</option>
+              <option value="PENDING">판단 대기</option>
+              <option value="WORSE">악화</option>
             </select>
           </label>
           <label>

@@ -401,3 +401,7 @@ button {
   display: grid;
   gap: 12px;
 }
+
+.log-panel .grid-shell {
+  max-height: 320px;
+}

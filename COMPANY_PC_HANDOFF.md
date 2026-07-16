@@ -48,6 +48,7 @@ git pull origin feature/reports
 - API account active toggle
 - API account connection test endpoint and UI
 - SEARCH_AD real external-call test via Naver SearchAd `/ncc/campaigns`
+- API account test logs are now stored in `SystemLog` and shown in the account screen
 - shared/package/server/web TypeScript build blockers fixed
 - Vite env typing and workspace build scripts aligned
 - server dotenv load order fixed so Prisma reads `DATABASE_URL` during runtime
@@ -57,7 +58,8 @@ git pull origin feature/reports
 
 1. Verify `feature/reports` UI rendering in browser.
 2. Test both CSV downloads with seeded snapshot data.
-3. Extend real external-call adapter to COMMERCE accounts.
+3. Run one SEARCH_AD live test and confirm a new log row appears in API account history.
+4. Extend real external-call adapter to COMMERCE accounts.
 4. Add filters or date range controls to report view.
 5. Merge validated feature branches into `dev`.
 

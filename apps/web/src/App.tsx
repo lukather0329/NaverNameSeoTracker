@@ -23,6 +23,9 @@ import {
 
 type ViewKey = "dashboard" | "accounts" | "products" | "experiments" | "tracking" | "results" | "reports";
 
+type AccountTestLogViewRow = SystemLogEntry & {
+  detailSummary: string;
+};
 type ExperimentReportRow = {
   id: string;
   name: string;
@@ -227,6 +230,13 @@ function ApiAccountsView({
   const [submitting, setSubmitting] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
   const accountGuide = accountTypeGuides[form.type];
+  const recentAccountTestLogs: AccountTestLogViewRow[] = systemLogs
+    .filter((row) => row.scope === "api-account-test")
+    .slice(0, 8)
+    .map((row) => ({
+      ...row,
+      detailSummary: formatApiAccountTestMeta(row.metaJson)
+    }));
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -768,6 +778,31 @@ function downloadCsv(fileName: string, csvText: string) {
   URL.revokeObjectURL(url);
 }
 
+function formatApiAccountTestMeta(metaJson?: string | null) {
+  if (!metaJson) {
+    return "-";
+  }
+
+  try {
+    const parsed = JSON.parse(metaJson) as {
+      accountType?: string | null;
+      mode?: string | null;
+      statusCode?: number | null;
+      details?: string | null;
+    };
+
+    const parts = [
+      parsed.accountType ? `type=${parsed.accountType}` : "",
+      parsed.mode ? `mode=${parsed.mode}` : "",
+      typeof parsed.statusCode === "number" ? `status=${parsed.statusCode}` : "",
+      parsed.details ? String(parsed.details).slice(0, 120) : ""
+    ].filter(Boolean);
+
+    return parts.length > 0 ? parts.join(" | ") : metaJson;
+  } catch {
+    return metaJson;
+  }
+}
 function formatDateTime(value: string) {
   return new Date(value).toLocaleString("ko-KR", {
     year: "numeric",

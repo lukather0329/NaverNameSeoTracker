@@ -119,6 +119,7 @@ router.get("/snapshot", async (_req, res) => {
       isActive: item.isActive,
       lastCheckedAt: item.lastCheckedAt,
       connectionStatus: item.connectionStatus,
+      lastTestSummary: latestAccountTestLogByAccountId.get(item.id) ?? null,
       createdAt: item.createdAt,
       updatedAt: item.updatedAt
     })),
@@ -130,7 +131,8 @@ router.get("/snapshot", async (_req, res) => {
     titleChangeLogs,
     experiments,
     jobs,
-    results
+    results,
+    systemLogs
   });
 });
 

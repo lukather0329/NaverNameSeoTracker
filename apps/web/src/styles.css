@@ -790,6 +790,10 @@ select {
   gap: 12px;
 }
 
+.log-filter-bar {
+  margin-top: -2px;
+}
+
 .log-panel .grid-shell {
   max-height: 320px;
 }

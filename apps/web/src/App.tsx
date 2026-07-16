@@ -25,6 +25,8 @@ type ViewKey = "dashboard" | "accounts" | "products" | "experiments" | "tracking
 
 type AccountTestLogViewRow = SystemLogEntry & {
   detailSummary: string;
+  testMode: "REAL" | "VALIDATION";
+  outcome: "SUCCESS" | "FAILED";
 };
 type AccountReadinessSummary = {
   label: string;
@@ -33,6 +35,7 @@ type AccountReadinessSummary = {
 };
 type AccountReadinessState = "LIVE_READY" | "VALIDATION_READY" | "INCOMPLETE";
 type AccountFilterValue = "ALL" | AccountReadinessState;
+type AccountLogFilterValue = "ALL" | "FAILED" | "SUCCESS" | "REAL" | "VALIDATION";
 type FormReadinessPreview = {
   state: AccountReadinessState;
   title: string;
@@ -298,21 +301,36 @@ function ApiAccountsView({
   const [feedback, setFeedback] = useState<FeedbackState | null>(null);
   const [accountFilter, setAccountFilter] = useState<AccountFilterValue>("ALL");
   const [activeOnly, setActiveOnly] = useState(false);
+  const [logFilter, setLogFilter] = useState<AccountLogFilterValue>("ALL");
   const accountGuide = accountTypeGuides[form.type];
   const saveTimingGuide = accountSaveTimingGuides[form.type];
   const recentAccountTestLogs: AccountTestLogViewRow[] = (systemLogs ?? [])
     .filter((row) => row.scope === "api-account-test")
     .slice(0, 8)
-    .map((row) => ({
-      ...row,
-      detailSummary: formatApiAccountTestMeta(row.metaJson)
-    }));
+    .map((row) => {
+      const meta = parseApiAccountTestMeta(row.metaJson);
+      return {
+        ...row,
+        detailSummary: formatParsedApiAccountTestMeta(meta, row.metaJson),
+        testMode: meta.mode === "real" ? "REAL" : "VALIDATION",
+        outcome: isApiAccountLogFailure(row.level) ? "FAILED" : "SUCCESS"
+      };
+    });
   const readinessSummary = buildAccountReadinessSummary(accounts, recentAccountTestLogs.length);
   const filteredAccounts = accounts.filter((account) => {
     const readiness = getAccountReadinessState(account);
     const readinessMatch = accountFilter === "ALL" || readiness === accountFilter;
     const activeMatch = !activeOnly || account.isActive;
     return readinessMatch && activeMatch;
+  });
+  const filteredLogRows = recentAccountTestLogs.filter((row) => {
+    if (logFilter === "ALL") {
+      return true;
+    }
+    if (logFilter === "FAILED" || logFilter === "SUCCESS") {
+      return row.outcome === logFilter;
+    }
+    return row.testMode === logFilter;
   });
   const formReadiness = buildFormReadinessPreview(form);
   const canSaveAccount = formReadiness.state !== "INCOMPLETE";
@@ -325,6 +343,13 @@ function ApiAccountsView({
     { value: "LIVE_READY", label: `Live Ready (${accounts.filter((account) => getAccountReadinessState(account) === "LIVE_READY").length})` },
     { value: "VALIDATION_READY", label: `Validation Ready (${accounts.filter((account) => getAccountReadinessState(account) === "VALIDATION_READY").length})` },
     { value: "INCOMPLETE", label: `Incomplete (${accounts.filter((account) => getAccountReadinessState(account) === "INCOMPLETE").length})` }
+  ];
+  const logFilterOptions: Array<{ value: AccountLogFilterValue; label: string }> = [
+    { value: "ALL", label: `All (${recentAccountTestLogs.length})` },
+    { value: "FAILED", label: `Failed (${recentAccountTestLogs.filter((row) => row.outcome === "FAILED").length})` },
+    { value: "SUCCESS", label: `Success (${recentAccountTestLogs.filter((row) => row.outcome === "SUCCESS").length})` },
+    { value: "REAL", label: `Real (${recentAccountTestLogs.filter((row) => row.testMode === "REAL").length})` },
+    { value: "VALIDATION", label: `Validation (${recentAccountTestLogs.filter((row) => row.testMode === "VALIDATION").length})` }
   ];
   const needsAdvancedCredentials = form.type !== "CUSTOM";
   const needsCustomerId = form.type === "SEARCH_AD";
@@ -627,6 +652,23 @@ function ApiAccountsView({
             <h3>Recent API Account Test Logs</h3>
           </div>
         </div>
+        <div className="account-filter-bar log-filter-bar">
+          <div className="account-filter-chip-row">
+            {logFilterOptions.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                className={option.value === logFilter ? "filter-chip active" : "filter-chip"}
+                onClick={() => setLogFilter(option.value)}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+          <div className="account-filter-summary">
+            <strong>{filteredLogRows.length}</strong> of {recentAccountTestLogs.length} logs shown
+          </div>
+        </div>
         {recentAccountTestLogs.length === 0 ? (
           <div className="empty-state-card">
             <strong>No account test logs yet.</strong>
@@ -643,7 +685,9 @@ function ApiAccountsView({
                 render: (row) => formatDateTime(row.createdAt)
               },
               { key: "level", title: "Level", width: 100, render: (row) => <StatusBadge value={row.level} /> },
-              { key: "message", title: "Message", width: 420 },
+              { key: "outcome", title: "Outcome", width: 120, render: (row) => <StatusBadge value={row.outcome} /> },
+              { key: "testMode", title: "Mode", width: 130, render: (row) => <StatusBadge value={row.testMode} /> },
+              { key: "message", title: "Message", width: 320 },
               {
                 key: "detailSummary",
                 title: "Details",
@@ -651,7 +695,7 @@ function ApiAccountsView({
                 render: (row) => row.detailSummary
               }
             ]}
-            rows={recentAccountTestLogs}
+            rows={filteredLogRows}
           />
         )}
       </div>
@@ -1387,31 +1431,40 @@ function isValidationReadyAccount(account: ApiAccount) {
   return Boolean(account.clientIdMasked && account.clientSecretMasked);
 }
 
-function formatApiAccountTestMeta(metaJson?: string | null) {
+type ParsedApiAccountTestMeta = {
+  accountType?: string | null;
+  mode?: string | null;
+  statusCode?: number | null;
+  details?: string | null;
+};
+
+function parseApiAccountTestMeta(metaJson?: string | null): ParsedApiAccountTestMeta {
   if (!metaJson) {
-    return "-";
+    return {};
   }
 
   try {
-    const parsed = JSON.parse(metaJson) as {
-      accountType?: string | null;
-      mode?: string | null;
-      statusCode?: number | null;
-      details?: string | null;
-    };
-
-    const parts = [
-      parsed.accountType ? `type=${parsed.accountType}` : "",
-      parsed.mode ? `mode=${parsed.mode}` : "",
-      typeof parsed.statusCode === "number" ? `status=${parsed.statusCode}` : "",
-      parsed.details ? String(parsed.details).slice(0, 120) : ""
-    ].filter(Boolean);
-
-    return parts.length > 0 ? parts.join(" | ") : metaJson;
+    return JSON.parse(metaJson) as ParsedApiAccountTestMeta;
   } catch {
-    return metaJson;
+    return {};
   }
 }
+
+function formatParsedApiAccountTestMeta(parsed: ParsedApiAccountTestMeta, fallback?: string | null) {
+  const parts = [
+    parsed.accountType ? `type=${parsed.accountType}` : "",
+    parsed.mode ? `mode=${parsed.mode}` : "",
+    typeof parsed.statusCode === "number" ? `status=${parsed.statusCode}` : "",
+    parsed.details ? String(parsed.details).slice(0, 120) : ""
+  ].filter(Boolean);
+
+  return parts.length > 0 ? parts.join(" | ") : fallback ?? "-";
+}
+
+function isApiAccountLogFailure(level: string) {
+  return ["ERROR", "FAILED", "WARN"].includes(level.toUpperCase());
+}
+
 function formatDateTime(value: string) {
   return new Date(value).toLocaleString("ko-KR", {
     year: "numeric",

@@ -909,14 +909,20 @@ function ResultsView({ results, products }: { results: RankTrackingResult[]; pro
 function ReportsView({ snapshot }: { snapshot: AppSnapshot }) {
   const experimentRows = buildExperimentReportRows(snapshot.experiments, snapshot.products, snapshot.results);
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
+  const [searchQuery, setSearchQuery] = useState("");
   const [judgementFilter, setJudgementFilter] = useState<string>("ALL");
   const [windowFilter, setWindowFilter] = useState<string>("ALL");
 
   const filteredRows = experimentRows.filter((row) => {
+    const normalizedQuery = searchQuery.trim().toLowerCase();
+    const searchMatch =
+      normalizedQuery.length === 0 ||
+      row.name.toLowerCase().includes(normalizedQuery) ||
+      row.productTitle.toLowerCase().includes(normalizedQuery);
     const statusMatch = statusFilter === "ALL" || row.status === statusFilter;
     const judgementMatch = judgementFilter === "ALL" || row.judgement === judgementFilter;
     const windowMatch = matchesTrackedWindow(row.trackedAtValue, windowFilter);
-    return statusMatch && judgementMatch && windowMatch;
+    return searchMatch && statusMatch && judgementMatch && windowMatch;
   });
   const filteredExperimentIds = new Set(filteredRows.map((row) => row.id));
   const filteredResults = snapshot.results.filter((row) => filteredExperimentIds.has(row.experimentId));
@@ -924,6 +930,7 @@ function ReportsView({ snapshot }: { snapshot: AppSnapshot }) {
 
   function resetFilters() {
     setStatusFilter("ALL");
+    setSearchQuery("");
     setJudgementFilter("ALL");
     setWindowFilter("ALL");
   }
@@ -970,6 +977,14 @@ function ReportsView({ snapshot }: { snapshot: AppSnapshot }) {
           </div>
         </div>
         <div className="report-filters">
+          <label>
+            <span>검색</span>
+            <input
+              value={searchQuery}
+              placeholder="실험명 또는 상품명"
+              onChange={(event) => setSearchQuery(event.target.value)}
+            />
+          </label>
           <label>
             <span>상태</span>
             <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>

@@ -286,6 +286,9 @@ function ApiAccountsView({
   const canSaveAccount = formReadiness.state !== "INCOMPLETE";
   const currentRequiredFields = getCurrentRequiredFields(form.type);
   const requiredFieldSet = new Set(currentRequiredFields);
+  const needsAdvancedCredentials = form.type !== "CUSTOM";
+  const needsCustomerId = form.type === "SEARCH_AD";
+  const needsCommerceTargets = form.type === "COMMERCE";
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -403,26 +406,36 @@ function ApiAccountsView({
           <span>{renderFieldLabel("Client Secret", requiredFieldSet)}</span>
           <input value={form.clientSecret} onChange={(event) => setForm({ ...form, clientSecret: event.target.value })} required />
         </label>
-        <label className={getFormFieldClassName(requiredFieldSet, "Access License")}>
-          <span>{renderFieldLabel("Access License", requiredFieldSet)}</span>
-          <input value={form.accessLicense ?? ""} onChange={(event) => setForm({ ...form, accessLicense: event.target.value })} />
-        </label>
-        <label className={getFormFieldClassName(requiredFieldSet, "Secret Key")}>
-          <span>{renderFieldLabel("Secret Key", requiredFieldSet)}</span>
-          <input value={form.secretKey ?? ""} onChange={(event) => setForm({ ...form, secretKey: event.target.value })} />
-        </label>
-        <label className={getFormFieldClassName(requiredFieldSet, "Customer ID")}>
-          <span>{renderFieldLabel("Customer ID", requiredFieldSet)}</span>
-          <input value={form.customerId ?? ""} onChange={(event) => setForm({ ...form, customerId: event.target.value })} />
-        </label>
-        <label className={getFormFieldClassName(requiredFieldSet, "Store ID or Channel ID", "Store ID")}>
-          <span>{renderFieldLabel("Store ID or Channel ID", requiredFieldSet, "Store ID")}</span>
-          <input value={form.storeId ?? ""} onChange={(event) => setForm({ ...form, storeId: event.target.value })} />
-        </label>
-        <label className={getFormFieldClassName(requiredFieldSet, "Store ID or Channel ID", "Channel ID")}>
-          <span>{renderFieldLabel("Store ID or Channel ID", requiredFieldSet, "Channel ID")}</span>
-          <input value={form.channelId ?? ""} onChange={(event) => setForm({ ...form, channelId: event.target.value })} />
-        </label>
+        {needsAdvancedCredentials && (
+          <>
+            <label className={getFormFieldClassName(requiredFieldSet, "Access License")}>
+              <span>{renderFieldLabel("Access License", requiredFieldSet)}</span>
+              <input value={form.accessLicense ?? ""} onChange={(event) => setForm({ ...form, accessLicense: event.target.value })} />
+            </label>
+            <label className={getFormFieldClassName(requiredFieldSet, "Secret Key")}>
+              <span>{renderFieldLabel("Secret Key", requiredFieldSet)}</span>
+              <input value={form.secretKey ?? ""} onChange={(event) => setForm({ ...form, secretKey: event.target.value })} />
+            </label>
+          </>
+        )}
+        {needsCustomerId && (
+          <label className={getFormFieldClassName(requiredFieldSet, "Customer ID")}>
+            <span>{renderFieldLabel("Customer ID", requiredFieldSet)}</span>
+            <input value={form.customerId ?? ""} onChange={(event) => setForm({ ...form, customerId: event.target.value })} />
+          </label>
+        )}
+        {needsCommerceTargets && (
+          <>
+            <label className={getFormFieldClassName(requiredFieldSet, "Store ID or Channel ID", "Store ID")}>
+              <span>{renderFieldLabel("Store ID or Channel ID", requiredFieldSet, "Store ID")}</span>
+              <input value={form.storeId ?? ""} onChange={(event) => setForm({ ...form, storeId: event.target.value })} />
+            </label>
+            <label className={getFormFieldClassName(requiredFieldSet, "Store ID or Channel ID", "Channel ID")}>
+              <span>{renderFieldLabel("Store ID or Channel ID", requiredFieldSet, "Channel ID")}</span>
+              <input value={form.channelId ?? ""} onChange={(event) => setForm({ ...form, channelId: event.target.value })} />
+            </label>
+          </>
+        )}
         <label className="checkbox-field field-optional">
           <input type="checkbox" checked={form.isActive} onChange={(event) => setForm({ ...form, isActive: event.target.checked })} />
           <span>Active</span>

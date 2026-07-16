@@ -26,6 +26,11 @@ type ViewKey = "dashboard" | "accounts" | "products" | "experiments" | "tracking
 type AccountTestLogViewRow = SystemLogEntry & {
   detailSummary: string;
 };
+type AccountReadinessSummary = {
+  label: string;
+  value: number;
+  caption: string;
+};
 type ExperimentReportRow = {
   id: string;
   name: string;
@@ -268,6 +273,7 @@ function ApiAccountsView({
       ...row,
       detailSummary: formatApiAccountTestMeta(row.metaJson)
     }));
+  const readinessSummary = buildAccountReadinessSummary(accounts, recentAccountTestLogs.length);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -317,6 +323,15 @@ function ApiAccountsView({
                 <li key={step}>{step}</li>
               ))}
             </ol>
+          </div>
+          <div className="card-grid account-summary-grid">
+            {readinessSummary.map((item) => (
+              <article key={item.label} className="metric-card panel tone-card compact-card">
+                <span>{item.label}</span>
+                <strong>{item.value}</strong>
+                <small>{item.caption}</small>
+              </article>
+            ))}
           </div>
         </div>
       </div>
@@ -898,6 +913,55 @@ function downloadCsv(fileName: string, csvText: string) {
   anchor.download = fileName;
   anchor.click();
   URL.revokeObjectURL(url);
+}
+
+function buildAccountReadinessSummary(accounts: ApiAccount[], recentLogCount: number): AccountReadinessSummary[] {
+  const liveReadyCount = accounts.filter(isLiveReadySearchAdAccount).length;
+  const validationReadyCount = accounts.filter(isValidationReadyAccount).length;
+  const activeCount = accounts.filter((account) => account.isActive).length;
+
+  return [
+    {
+      label: "Saved Accounts",
+      value: accounts.length,
+      caption: `${activeCount} active`
+    },
+    {
+      label: "Live Ready",
+      value: liveReadyCount,
+      caption: "SEARCH_AD credentials complete"
+    },
+    {
+      label: "Validation Ready",
+      value: validationReadyCount,
+      caption: "Ready for non-live checks"
+    },
+    {
+      label: "Recent Tests",
+      value: recentLogCount,
+      caption: "Latest connection log rows"
+    }
+  ];
+}
+
+function isLiveReadySearchAdAccount(account: ApiAccount) {
+  if (account.type !== "SEARCH_AD") {
+    return false;
+  }
+
+  return Boolean(account.accessLicenseMasked && account.secretKeyMasked && account.customerId);
+}
+
+function isValidationReadyAccount(account: ApiAccount) {
+  if (account.type === "SEARCH_AD") {
+    return isLiveReadySearchAdAccount(account);
+  }
+
+  if (account.type === "COMMERCE") {
+    return Boolean(account.accessLicenseMasked && account.secretKeyMasked && (account.storeId || account.channelId));
+  }
+
+  return Boolean(account.clientIdMasked && account.clientSecretMasked);
 }
 
 function formatApiAccountTestMeta(metaJson?: string | null) {

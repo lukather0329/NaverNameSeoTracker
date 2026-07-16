@@ -419,6 +419,23 @@ select {
   line-height: 1.6;
 }
 
+.account-summary-grid {
+  margin-top: 4px;
+}
+
+.compact-card {
+  min-height: 148px;
+  gap: 10px;
+}
+
+.compact-card strong {
+  font-size: 30px;
+}
+
+.compact-card small {
+  line-height: 1.5;
+}
+
 .account-form {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));

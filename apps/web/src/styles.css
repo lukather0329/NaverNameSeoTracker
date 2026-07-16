@@ -646,3 +646,60 @@ select {
   font-size: 12px;
   font-weight: 800;
 }
+
+.report-filter-panel {
+  gap: 16px;
+}
+
+.report-filters {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.report-filters label {
+  display: grid;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-soft);
+}
+
+.report-filters select {
+  min-height: 46px;
+  padding: 12px 14px;
+  color: var(--text-main);
+  border: 1px solid rgba(224, 229, 250, 0.96);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.98);
+}
+
+.filter-summary {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 999px;
+  color: #4318ff;
+  background: rgba(117, 81, 255, 0.1);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.empty-state-card {
+  display: grid;
+  gap: 8px;
+  padding: 28px;
+  border: 1px dashed rgba(117, 81, 255, 0.24);
+  border-radius: 20px;
+  background: rgba(244, 247, 254, 0.7);
+}
+
+.empty-state-card strong {
+  font-size: 18px;
+  color: var(--text-main);
+}
+
+.empty-state-card p {
+  margin: 0;
+  color: var(--text-soft);
+}

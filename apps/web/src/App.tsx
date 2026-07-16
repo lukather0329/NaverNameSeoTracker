@@ -38,6 +38,7 @@ type AccountLogFocusCard = {
   value: number;
   caption: string;
   toneClass: string;
+  filterValue: Exclude<AccountLogFilterValue, "ALL">;
 };
 type AccountReadinessState = "LIVE_READY" | "VALIDATION_READY" | "INCOMPLETE";
 type AccountFilterValue = "ALL" | AccountReadinessState;
@@ -435,13 +436,22 @@ function ApiAccountsView({
             ))}
           </div>
           <div className="card-grid account-focus-grid">
-            {logFocusCards.map((item) => (
-              <article key={item.label} className={`metric-card panel compact-card focus-card ${item.toneClass}`}>
-                <span>{item.label}</span>
-                <strong>{item.value}</strong>
-                <small>{item.caption}</small>
-              </article>
-            ))}
+            {logFocusCards.map((item) => {
+              const isActive = logFilter === item.filterValue;
+              return (
+                <button
+                  key={item.label}
+                  type="button"
+                  className={`metric-card panel compact-card focus-card ${item.toneClass}${isActive ? " active" : ""}`}
+                  onClick={() => setLogFilter(isActive ? "ALL" : item.filterValue)}
+                  title={isActive ? "Show all logs" : `Filter logs by ${item.label}`}
+                >
+                  <span>{item.label}</span>
+                  <strong>{item.value}</strong>
+                  <small>{item.caption}</small>
+                </button>
+              );
+            })}
           </div>
         </div>
       </div>
@@ -1438,25 +1448,29 @@ function buildAccountLogFocusCards(logs: AccountTestLogViewRow[]): AccountLogFoc
       label: "Recent Failed",
       value: failedCount,
       caption: failedCount > 0 ? "Review credentials or connection errors first" : "No recent failures in the latest log window",
-      toneClass: "failed"
+      toneClass: "failed",
+      filterValue: "FAILED"
     },
     {
       label: "Recent Success",
       value: successCount,
       caption: successCount > 0 ? "Healthy connection checks completed recently" : "No recent successful checks recorded yet",
-      toneClass: "success"
+      toneClass: "success",
+      filterValue: "SUCCESS"
     },
     {
       label: "Real Mode",
       value: realCount,
       caption: realCount > 0 ? "Live SearchAd checks were executed" : "No live external test in the recent log window",
-      toneClass: "info"
+      toneClass: "info",
+      filterValue: "REAL"
     },
     {
       label: "Validation Mode",
       value: validationCount,
       caption: "Non-live checks useful before production credentials",
-      toneClass: "warning"
+      toneClass: "warning",
+      filterValue: "VALIDATION"
     }
   ];
 }

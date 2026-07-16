@@ -38,6 +38,7 @@ type ExperimentReportRow = {
   avgDelta: string;
   upRate: string;
   trackedAt: string;
+  trackedAtValue?: string;
 };
 
 const navItems: Array<{ key: ViewKey; label: string }> = [
@@ -694,7 +695,8 @@ function buildExperimentReportRows(
       latestRank: latest?.currentRank?.toString() ?? "-",
       avgDelta,
       upRate,
-      trackedAt: latest ? formatDateTime(latest.trackedAt) : "-"
+      trackedAt: latest ? formatDateTime(latest.trackedAt) : "-",
+      trackedAtValue: latest?.trackedAt
     };
   });
 }
@@ -733,6 +735,27 @@ function buildReportSummary(snapshot: AppSnapshot, experimentRows: ExperimentRep
       caption: `${experimentRows.filter((row) => row.avgDelta !== "-").length}개 실험 반영`
     }
   ];
+}
+
+function matchesTrackedWindow(trackedAtValue: string | undefined, windowFilter: string) {
+  if (windowFilter === "ALL" || !trackedAtValue) {
+    return true;
+  }
+  const trackedAt = new Date(trackedAtValue).getTime();
+  if (Number.isNaN(trackedAt)) {
+    return false;
+  }
+  const now = Date.now();
+  const thresholds: Record<string, number> = {
+    "7D": 7,
+    "30D": 30,
+    "90D": 90
+  };
+  const days = thresholds[windowFilter];
+  if (!days) {
+    return true;
+  }
+  return now - trackedAt <= days * 24 * 60 * 60 * 1000;
 }
 
 function buildExperimentCsv(rows: ExperimentReportRow[]) {

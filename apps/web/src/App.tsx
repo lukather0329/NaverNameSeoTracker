@@ -83,6 +83,35 @@ const accountTypeGuides: Record<
     note: "Reserved for future adapters or internal integrations."
   }
 };
+const accountSaveTimingGuides: Record<
+  ApiAccountFormInput["type"],
+  { recommendedMoment: string; steps: string[] }
+> = {
+  SEARCH_AD: {
+    recommendedMoment: "Save it right before your first live connection test.",
+    steps: [
+      "Prepare the real Client ID, Client Secret, Access License, Secret Key, and Customer ID.",
+      "Save the account once the values are confirmed and ready for immediate testing.",
+      "Run Test Connection right away so you can verify the credentials while the context is fresh."
+    ]
+  },
+  COMMERCE: {
+    recommendedMoment: "Save it after credential collection, before the future live adapter rollout.",
+    steps: [
+      "Collect the base credentials plus Access License, Secret Key, and Store ID or Channel ID.",
+      "Save the account now if you want the team to review and manage it in one place.",
+      "Plan the real external test later, because COMMERCE currently runs validation-only checks."
+    ]
+  },
+  CUSTOM: {
+    recommendedMoment: "Save it when the basic credentials are ready for internal review.",
+    steps: [
+      "Prepare Client ID and Client Secret first.",
+      "Save the account when the team needs a shared record of the integration target.",
+      "Add the live adapter later if this account type gets a real external connection flow."
+    ]
+  }
+};
 
 export function App() {
   const [view, setView] = useState<ViewKey>("dashboard");
@@ -231,6 +260,7 @@ function ApiAccountsView({
   const [submitting, setSubmitting] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
   const accountGuide = accountTypeGuides[form.type];
+  const saveTimingGuide = accountSaveTimingGuides[form.type];
   const recentAccountTestLogs: AccountTestLogViewRow[] = (systemLogs ?? [])
     .filter((row) => row.scope === "api-account-test")
     .slice(0, 8)
@@ -278,6 +308,15 @@ function ApiAccountsView({
                 </span>
               ))}
             </div>
+          </div>
+          <div className="save-timing-card">
+            <strong>When should I save the API info?</strong>
+            <p>{saveTimingGuide.recommendedMoment}</p>
+            <ol className="guide-step-list">
+              {saveTimingGuide.steps.map((step: string) => (
+                <li key={step}>{step}</li>
+              ))}
+            </ol>
           </div>
         </div>
       </div>

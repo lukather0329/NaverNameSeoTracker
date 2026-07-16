@@ -580,7 +580,8 @@ select {
 .status-running,
 .status-up,
 .status-effective,
-.status-info {
+.status-info,
+.status-live_ready {
   color: #05cd99;
   background: rgba(5, 205, 153, 0.12);
 }
@@ -596,7 +597,8 @@ select {
 .status-unverified,
 .status-draft,
 .status-pending,
-.status-same {
+.status-same,
+.status-validation_ready {
   color: #718096;
   background: rgba(113, 128, 150, 0.12);
 }
@@ -604,7 +606,8 @@ select {
 .status-expired,
 .status-paused,
 .status-low_effect,
-.status-out {
+.status-out,
+.status-incomplete {
   color: #ffb547;
   background: rgba(255, 181, 71, 0.16);
 }

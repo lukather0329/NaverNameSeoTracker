@@ -31,6 +31,7 @@ type AccountReadinessSummary = {
   value: number;
   caption: string;
 };
+type AccountReadinessState = "LIVE_READY" | "VALIDATION_READY" | "INCOMPLETE";
 type ExperimentReportRow = {
   id: string;
   name: string;
@@ -396,6 +397,18 @@ function ApiAccountsView({
           { key: "clientSecretMasked", title: "Client Secret", width: 180 },
           { key: "storeId", title: "Store ID", width: 140 },
           { key: "channelId", title: "Channel ID", width: 140 },
+          {
+            key: "readiness",
+            title: "Readiness",
+            width: 150,
+            render: (row) => <StatusBadge value={getAccountReadinessState(row)} />
+          },
+          {
+            key: "readinessHint",
+            title: "Test Mode",
+            width: 220,
+            render: (row) => getAccountReadinessHint(row)
+          },
           {
             key: "lastTestSummary",
             title: "Latest Test",
@@ -913,6 +926,30 @@ function downloadCsv(fileName: string, csvText: string) {
   anchor.download = fileName;
   anchor.click();
   URL.revokeObjectURL(url);
+}
+
+function getAccountReadinessState(account: ApiAccount): AccountReadinessState {
+  if (isLiveReadySearchAdAccount(account)) {
+    return "LIVE_READY";
+  }
+
+  if (isValidationReadyAccount(account)) {
+    return "VALIDATION_READY";
+  }
+
+  return "INCOMPLETE";
+}
+
+function getAccountReadinessHint(account: ApiAccount) {
+  if (account.type === "SEARCH_AD") {
+    return isLiveReadySearchAdAccount(account) ? "Real external test available" : "Missing fields for live SearchAd test";
+  }
+
+  if (account.type === "COMMERCE") {
+    return isValidationReadyAccount(account) ? "Validation-only check available" : "Add commerce credential fields";
+  }
+
+  return isValidationReadyAccount(account) ? "Basic validation available" : "Client ID and Secret required";
 }
 
 function buildAccountReadinessSummary(accounts: ApiAccount[], recentLogCount: number): AccountReadinessSummary[] {

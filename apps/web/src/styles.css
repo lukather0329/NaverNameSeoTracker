@@ -1,4 +1,4 @@
-﻿:root {
+:root {
   font-family: "Segoe UI", "Pretendard", sans-serif;
   color: #1d2838;
   background:
@@ -199,6 +199,39 @@ button {
   margin: 8px 0 0;
   color: #627489;
   font-size: 14px;
+}
+
+.type-guide-card {
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1px solid rgba(23, 52, 84, 0.12);
+  border-radius: 16px;
+  background: rgba(240, 246, 252, 0.9);
+}
+
+.type-guide-card p {
+  margin: 0;
+  color: #536276;
+  font-size: 14px;
+}
+
+.guide-chip-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.guide-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  color: #173454;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(23, 52, 84, 0.08);
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .account-form {

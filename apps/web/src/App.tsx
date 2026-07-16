@@ -58,6 +58,26 @@ const defaultApiAccountForm: ApiAccountFormInput = {
   channelId: "",
   isActive: true
 };
+const accountTypeGuides: Record<
+  ApiAccountFormInput["type"],
+  { modeLabel: string; requiredFields: string[]; note: string }
+> = {
+  SEARCH_AD: {
+    modeLabel: "Live external test",
+    requiredFields: ["Client ID", "Client Secret", "Access License", "Secret Key", "Customer ID"],
+    note: "Uses the Naver SearchAd live connection test endpoint."
+  },
+  COMMERCE: {
+    modeLabel: "Validation only",
+    requiredFields: ["Client ID", "Client Secret", "Access License", "Secret Key", "Store ID or Channel ID"],
+    note: "Commerce live adapter is the next follow-up task."
+  },
+  CUSTOM: {
+    modeLabel: "Validation only",
+    requiredFields: ["Client ID", "Client Secret"],
+    note: "Reserved for future adapters or internal integrations."
+  }
+};
 
 export function App() {
   const [view, setView] = useState<ViewKey>("dashboard");
@@ -202,6 +222,7 @@ function ApiAccountsView({
   const [form, setForm] = useState<ApiAccountFormInput>(defaultApiAccountForm);
   const [submitting, setSubmitting] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const accountGuide = accountTypeGuides[form.type];
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -232,6 +253,17 @@ function ApiAccountsView({
           <p className="eyebrow">연결 상태</p>
           <h2>네이버 API 계정</h2>
           <p className="helper-copy">SEARCH_AD runs a live external API test. COMMERCE and CUSTOM currently run validation-only checks.</p>
+          <div className="type-guide-card">
+            <strong>{accountGuide.modeLabel}</strong>
+            <p>{accountGuide.note}</p>
+            <div className="guide-chip-row">
+              {accountGuide.requiredFields.map((field: string) => (
+                <span key={field} className="guide-chip">
+                  {field}
+                </span>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
       <form className="account-form" onSubmit={handleSubmit}>

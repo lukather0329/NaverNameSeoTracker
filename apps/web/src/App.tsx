@@ -930,6 +930,17 @@ function ReportsView({ snapshot }: { snapshot: AppSnapshot }) {
   const filteredResults = snapshot.results.filter((row) => filteredExperimentIds.has(row.experimentId));
   const summaryCards = buildReportSummary(snapshot, filteredRows);
 
+  const reportSortSummaryLabel =
+    sortKey === "LATEST_TRACKED"
+      ? "최신 추적순"
+      : sortKey === "BEST_RANK"
+        ? "최신 순위 낮은 순"
+        : sortKey === "BEST_DELTA"
+          ? "평균 변화량 높은 순"
+          : sortKey === "BEST_UP_RATE"
+            ? "상승 비율 높은 순"
+            : "실험명 가나다순";
+
   function resetFilters() {
     setStatusFilter("ALL");
     setSearchQuery("");
@@ -971,6 +982,7 @@ function ReportsView({ snapshot }: { snapshot: AppSnapshot }) {
           <div>
             <p className="eyebrow">리포트 필터</p>
             <h3>리포트 행 필터</h3>
+            <p className="helper-copy">현재 정렬: {reportSortSummaryLabel}</p>
           </div>
           <div className="inline-actions">
             <span className="filter-summary">실험 {sortedRows.length}개</span>

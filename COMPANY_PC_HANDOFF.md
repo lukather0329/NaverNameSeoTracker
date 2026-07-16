@@ -22,6 +22,7 @@ Current focus branch: `feature/reports`
 - `feature/reports`
   - current working branch
   - added report screen, summary cards, experiment report table, CSV export flow
+  - workspace build verified on 2026-07-16 with `npm run build`
 
 ## 2. First steps on company PC
 
@@ -39,16 +40,19 @@ git pull origin feature/reports
 - experiment-level report table
 - CSV export for experiment report
 - CSV export for ranking results
+- shared/package/server/web TypeScript build blockers fixed
+- Vite env typing and workspace build scripts aligned
 
 ## 4. Recommended next work order
 
-1. Verify `feature/reports` UI rendering.
-2. Run local app and test both CSV downloads.
+1. Verify `feature/reports` UI rendering in browser.
+2. Test both CSV downloads with real snapshot data.
 3. Backfill report APIs or server-side export if needed.
 4. Merge validated feature branches into `dev`.
 
 ## 5. Report branch verification checklist
 
+- run `npm run build` once and confirm success
 - open the app and click `리포트`
 - confirm summary cards render
 - confirm experiment table data matches current snapshot
@@ -63,6 +67,7 @@ cd /d/codex/NaverNameSeoTracker
 git checkout feature/reports
 git pull origin feature/reports
 npm install
+npm run build
 npm run dev
 ```
 

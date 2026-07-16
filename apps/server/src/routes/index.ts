@@ -74,7 +74,7 @@ router.get("/snapshot", async (_req, res) => {
 
   res.json({
     dashboard,
-    apiAccounts: apiAccounts.map((item) => ({
+    apiAccounts: apiAccounts.map((item: (typeof apiAccounts)[number]) => ({
       id: item.id,
       name: item.name,
       type: item.type,
@@ -91,7 +91,7 @@ router.get("/snapshot", async (_req, res) => {
       createdAt: item.createdAt,
       updatedAt: item.updatedAt
     })),
-    products: products.map((item) => ({
+    products: products.map((item: (typeof products)[number]) => ({
       ...item,
       trackingKeywords: item.trackingKeywords.split(",").filter(Boolean)
     })),

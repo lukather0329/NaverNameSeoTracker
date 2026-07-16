@@ -116,19 +116,19 @@ const accountTypeGuides: Record<
   { modeLabel: string; requiredFields: string[]; note: string }
 > = {
   SEARCH_AD: {
-    modeLabel: "Live external test",
-    requiredFields: ["Client ID", "Client Secret", "Access License", "Secret Key", "Customer ID"],
-    note: "Uses the Naver SearchAd live connection test endpoint."
+    modeLabel: "?? ?? ?? ???",
+    requiredFields: ["????? ID", "????? ???", "??? ????", "??? ?", "?? ID"],
+    note: "??? ???? ?? ?? ??? ?????? ?????."
   },
   COMMERCE: {
-    modeLabel: "Validation only",
-    requiredFields: ["Client ID", "Client Secret", "Access License", "Secret Key", "Store ID or Channel ID"],
-    note: "Commerce live adapter is the next follow-up task."
+    modeLabel: "?? ??",
+    requiredFields: ["????? ID", "????? ???", "??? ????", "??? ?", "??? ID ?? ?? ID"],
+    note: "??? ??? ???? ?? ?? ?????."
   },
   CUSTOM: {
-    modeLabel: "Validation only",
-    requiredFields: ["Client ID", "Client Secret"],
-    note: "Reserved for future adapters or internal integrations."
+    modeLabel: "?? ??",
+    requiredFields: ["????? ID", "????? ???"],
+    note: "?? ??? ?? ?? ????? ??? ?????."
   }
 };
 const accountSaveTimingGuides: Record<
@@ -136,27 +136,27 @@ const accountSaveTimingGuides: Record<
   { recommendedMoment: string; steps: string[] }
 > = {
   SEARCH_AD: {
-    recommendedMoment: "Save it right before your first live connection test.",
+    recommendedMoment: "? ?? ?? ???? ???? ??? ?????.",
     steps: [
-      "Prepare the real Client ID, Client Secret, Access License, Secret Key, and Customer ID.",
-      "Save the account once the values are confirmed and ready for immediate testing.",
-      "Run Test Connection right away so you can verify the credentials while the context is fresh."
+      "?? ????? ID, ????? ???, ??? ????, ??? ?, ?? ID? ?????.",
+      "?? ?? ???? ?? ???? ? ?? ? ??? ?????.",
+      "?? ?? ???? ??? ????? ?? ?????."
     ]
   },
   COMMERCE: {
-    recommendedMoment: "Save it after credential collection, before the future live adapter rollout.",
+    recommendedMoment: "????? ?? ?, ?? ??? ??? ?? ?? ?????.",
     steps: [
-      "Collect the base credentials plus Access License, Secret Key, and Store ID or Channel ID.",
-      "Save the account now if you want the team to review and manage it in one place.",
-      "Plan the real external test later, because COMMERCE currently runs validation-only checks."
+      "?? ????? ?? ??? ????, ??? ?, ??? ID ?? ?? ID? ?????.",
+      "?? ? ??? ???? ???? ??? ?? ?????.",
+      "COMMERCE? ?? ?? ????? ?? ?? ???? ?? ??? ?????."
     ]
   },
   CUSTOM: {
-    recommendedMoment: "Save it when the basic credentials are ready for internal review.",
+    recommendedMoment: "?? ????? ?? ?? ??? ??? ?? ?????.",
     steps: [
-      "Prepare Client ID and Client Secret first.",
-      "Save the account when the team needs a shared record of the integration target.",
-      "Add the live adapter later if this account type gets a real external connection flow."
+      "?? ????? ID? ????? ???? ?????.",
+      "?? ?? ??? ?? ???? ? ??? ??? ?????.",
+      "? ?? ??? ?? ?? ?? ??? ??? ?? ??? ???? ?????."
     ]
   }
 };
@@ -346,7 +346,7 @@ function ApiAccountsView({
     return readinessMatch && activeMatch && logLinkedMatch;
   });
   const accountScopeSummary = shouldLinkAccountsToLogs
-    ? `Linked to ${filteredLogRows.length} filtered log${filteredLogRows.length === 1 ? "" : "s"}`
+    ? `??? ?? ${filteredLogRows.length}?? ???`
     : null;
   const formReadiness = buildFormReadinessPreview(form);
   const canSaveAccount = formReadiness.state !== "INCOMPLETE";
@@ -355,17 +355,17 @@ function ApiAccountsView({
   const nextActionGuide = buildNextActionGuide(accounts, formReadiness, form.type);
   const fieldHints = buildFieldHints(form.type);
   const accountFilterOptions: Array<{ value: AccountFilterValue; label: string }> = [
-    { value: "ALL", label: `All (${accounts.length})` },
-    { value: "LIVE_READY", label: `Live Ready (${accounts.filter((account) => getAccountReadinessState(account) === "LIVE_READY").length})` },
-    { value: "VALIDATION_READY", label: `Validation Ready (${accounts.filter((account) => getAccountReadinessState(account) === "VALIDATION_READY").length})` },
-    { value: "INCOMPLETE", label: `Incomplete (${accounts.filter((account) => getAccountReadinessState(account) === "INCOMPLETE").length})` }
+    { value: "ALL", label: `?? (${accounts.length})` },
+    { value: "LIVE_READY", label: `???? ?? (${accounts.filter((account) => getAccountReadinessState(account) === "LIVE_READY").length})` },
+    { value: "VALIDATION_READY", label: `?? ?? (${accounts.filter((account) => getAccountReadinessState(account) === "VALIDATION_READY").length})` },
+    { value: "INCOMPLETE", label: `??? (${accounts.filter((account) => getAccountReadinessState(account) === "INCOMPLETE").length})` }
   ];
   const logFilterOptions: Array<{ value: AccountLogFilterValue; label: string }> = [
-    { value: "ALL", label: `All (${recentAccountTestLogs.length})` },
-    { value: "FAILED", label: `Failed (${recentAccountTestLogs.filter((row) => row.outcome === "FAILED").length})` },
-    { value: "SUCCESS", label: `Success (${recentAccountTestLogs.filter((row) => row.outcome === "SUCCESS").length})` },
-    { value: "REAL", label: `Real (${recentAccountTestLogs.filter((row) => row.testMode === "REAL").length})` },
-    { value: "VALIDATION", label: `Validation (${recentAccountTestLogs.filter((row) => row.testMode === "VALIDATION").length})` }
+    { value: "ALL", label: `?? (${recentAccountTestLogs.length})` },
+    { value: "FAILED", label: `?? (${recentAccountTestLogs.filter((row) => row.outcome === "FAILED").length})` },
+    { value: "SUCCESS", label: `?? (${recentAccountTestLogs.filter((row) => row.outcome === "SUCCESS").length})` },
+    { value: "REAL", label: `??? (${recentAccountTestLogs.filter((row) => row.testMode === "REAL").length})` },
+    { value: "VALIDATION", label: `?? (${recentAccountTestLogs.filter((row) => row.testMode === "VALIDATION").length})` }
   ];
   const needsAdvancedCredentials = form.type !== "CUSTOM";
   const needsCustomerId = form.type === "SEARCH_AD";
@@ -378,7 +378,7 @@ function ApiAccountsView({
     if (!canSaveAccount) {
       setFeedback({
         tone: "warning",
-        message: `Complete the required fields first: ${formReadiness.missingFields.join(", ")}`
+        message: `?? ???? ?? ?????: ${formReadiness.missingFields.join(", ")}`
       });
       return;
     }
@@ -411,9 +411,9 @@ function ApiAccountsView({
     <section className="panel">
       <div className="section-heading">
         <div>
-          <p className="eyebrow">Connection Status</p>
-          <h2>Naver API Accounts</h2>
-          <p className="helper-copy">SEARCH_AD runs a live external API test. COMMERCE and CUSTOM currently run validation-only checks.</p>
+          <p className="eyebrow">?? ??</p>
+          <h2>??? API ??</h2>
+          <p className="helper-copy">SEARCH_AD? ?? ?? API ???? ????, COMMERCE? CUSTOM? ?? ?? ?? ??? ?????.</p>
           <div className="type-guide-card">
             <strong>{accountGuide.modeLabel}</strong>
             <p>{accountGuide.note}</p>
@@ -426,7 +426,7 @@ function ApiAccountsView({
             </div>
           </div>
           <div className="save-timing-card">
-            <strong>When should I save the API info?</strong>
+            <strong>API ??? ?? ???? ????</strong>
             <p>{saveTimingGuide.recommendedMoment}</p>
             <ol className="guide-step-list">
               {saveTimingGuide.steps.map((step: string) => (
@@ -452,7 +452,7 @@ function ApiAccountsView({
                   type="button"
                   className={`metric-card panel compact-card focus-card ${item.toneClass}${isActive ? " active" : ""}`}
                   onClick={() => setLogFilter(isActive ? "ALL" : item.filterValue)}
-                  title={isActive ? "Show all logs" : `Filter logs by ${item.label}`}
+                  title={isActive ? "?? ?? ??" : `${item.label} ???? ?? ???`}
                 >
                   <span>{item.label}</span>
                   <strong>{item.value}</strong>
@@ -464,15 +464,15 @@ function ApiAccountsView({
         </div>
       </div>
       <div className="next-action-card">
-        <p className="eyebrow">Next Action</p>
+        <p className="eyebrow">?? ??</p>
         <strong>{nextActionGuide.title}</strong>
         <p>{nextActionGuide.description}</p>
       </div>
       <div className="form-checklist-card">
         <div className="section-heading">
           <div>
-            <p className="eyebrow">Form Checklist</p>
-            <h3>Required Right Now</h3>
+            <p className="eyebrow">?? ?????</p>
+            <h3>?? ??? ??</h3>
           </div>
         </div>
         <div className="guide-chip-row">
@@ -486,71 +486,71 @@ function ApiAccountsView({
           <div className="guide-chip-row">
             {formReadiness.missingFields.map((field) => (
               <span key={field} className="guide-chip muted">
-                Missing: {field}
+                ??: {field}
               </span>
             ))}
           </div>
         ) : (
-          <p className="checklist-success">All required fields for the current flow are filled.</p>
+          <p className="checklist-success">?? ???? ??? ??? ?? ???????.</p>
         )}
       </div>
       <form className="account-form" onSubmit={handleSubmit}>
-        <label className={getFormFieldClassName(requiredFieldSet, "Account Name")}>
-          <span>{renderFieldLabel("Account Name", requiredFieldSet)}</span>
+        <label className={getFormFieldClassName(requiredFieldSet, "???")}>
+          <span>{renderFieldLabel("???", requiredFieldSet)}</span>
           <input value={form.name} placeholder={fieldHints.name.placeholder} onChange={(event) => setForm({ ...form, name: event.target.value })} required />
           <small className="field-helper">{fieldHints.name.helper}</small>
         </label>
         <label className="field-required">
-          <span>Type <em className="field-badge required">Required</em></span>
+          <span>?? <em className="field-badge required">??</em></span>
           <select
             value={form.type}
             onChange={(event) => setForm({ ...form, type: event.target.value as ApiAccountFormInput["type"] })}
           >
-            <option value="COMMERCE">Naver Commerce API</option>
-            <option value="SEARCH_AD">Naver SearchAd API</option>
-            <option value="CUSTOM">Custom / Future Adapter</option>
+            <option value="COMMERCE">??? ??? API</option>
+            <option value="SEARCH_AD">??? ???? API</option>
+            <option value="CUSTOM">??? / ?? ???</option>
           </select>
         </label>
-        <label className={getFormFieldClassName(requiredFieldSet, "Client ID")}>
-          <span>{renderFieldLabel("Client ID", requiredFieldSet)}</span>
+        <label className={getFormFieldClassName(requiredFieldSet, "????? ID")}>
+          <span>{renderFieldLabel("????? ID", requiredFieldSet)}</span>
           <input value={form.clientId} placeholder={fieldHints.clientId.placeholder} onChange={(event) => setForm({ ...form, clientId: event.target.value })} required />
           <small className="field-helper">{fieldHints.clientId.helper}</small>
         </label>
-        <label className={getFormFieldClassName(requiredFieldSet, "Client Secret")}>
-          <span>{renderFieldLabel("Client Secret", requiredFieldSet)}</span>
+        <label className={getFormFieldClassName(requiredFieldSet, "????? ???")}>
+          <span>{renderFieldLabel("????? ???", requiredFieldSet)}</span>
           <input value={form.clientSecret} placeholder={fieldHints.clientSecret.placeholder} onChange={(event) => setForm({ ...form, clientSecret: event.target.value })} required />
           <small className="field-helper">{fieldHints.clientSecret.helper}</small>
         </label>
         {needsAdvancedCredentials && (
           <>
-            <label className={getFormFieldClassName(requiredFieldSet, "Access License")}>
-              <span>{renderFieldLabel("Access License", requiredFieldSet)}</span>
+            <label className={getFormFieldClassName(requiredFieldSet, "??? ????")}>
+              <span>{renderFieldLabel("??? ????", requiredFieldSet)}</span>
               <input value={form.accessLicense ?? ""} placeholder={fieldHints.accessLicense.placeholder} onChange={(event) => setForm({ ...form, accessLicense: event.target.value })} />
               <small className="field-helper">{fieldHints.accessLicense.helper}</small>
             </label>
-            <label className={getFormFieldClassName(requiredFieldSet, "Secret Key")}>
-              <span>{renderFieldLabel("Secret Key", requiredFieldSet)}</span>
+            <label className={getFormFieldClassName(requiredFieldSet, "??? ?")}>
+              <span>{renderFieldLabel("??? ?", requiredFieldSet)}</span>
               <input value={form.secretKey ?? ""} placeholder={fieldHints.secretKey.placeholder} onChange={(event) => setForm({ ...form, secretKey: event.target.value })} />
               <small className="field-helper">{fieldHints.secretKey.helper}</small>
             </label>
           </>
         )}
         {needsCustomerId && (
-          <label className={getFormFieldClassName(requiredFieldSet, "Customer ID")}>
-            <span>{renderFieldLabel("Customer ID", requiredFieldSet)}</span>
+          <label className={getFormFieldClassName(requiredFieldSet, "?? ID")}>
+            <span>{renderFieldLabel("?? ID", requiredFieldSet)}</span>
             <input value={form.customerId ?? ""} placeholder={fieldHints.customerId.placeholder} onChange={(event) => setForm({ ...form, customerId: event.target.value })} />
             <small className="field-helper">{fieldHints.customerId.helper}</small>
           </label>
         )}
         {needsCommerceTargets && (
           <>
-            <label className={getFormFieldClassName(requiredFieldSet, "Store ID or Channel ID", "Store ID")}>
-              <span>{renderFieldLabel("Store ID or Channel ID", requiredFieldSet, "Store ID")}</span>
+            <label className={getFormFieldClassName(requiredFieldSet, "??? ID ?? ?? ID", "??? ID")}>
+              <span>{renderFieldLabel("??? ID ?? ?? ID", requiredFieldSet, "??? ID")}</span>
               <input value={form.storeId ?? ""} placeholder={fieldHints.storeId.placeholder} onChange={(event) => setForm({ ...form, storeId: event.target.value })} />
               <small className="field-helper">{fieldHints.storeId.helper}</small>
             </label>
-            <label className={getFormFieldClassName(requiredFieldSet, "Store ID or Channel ID", "Channel ID")}>
-              <span>{renderFieldLabel("Store ID or Channel ID", requiredFieldSet, "Channel ID")}</span>
+            <label className={getFormFieldClassName(requiredFieldSet, "??? ID ?? ?? ID", "?? ID")}>
+              <span>{renderFieldLabel("??? ID ?? ?? ID", requiredFieldSet, "?? ID")}</span>
               <input value={form.channelId ?? ""} placeholder={fieldHints.channelId.placeholder} onChange={(event) => setForm({ ...form, channelId: event.target.value })} />
               <small className="field-helper">{fieldHints.channelId.helper}</small>
             </label>
@@ -558,22 +558,22 @@ function ApiAccountsView({
         )}
         <label className="checkbox-field field-optional">
           <input type="checkbox" checked={form.isActive} onChange={(event) => setForm({ ...form, isActive: event.target.checked })} />
-          <span>Active</span>
+          <span>???</span>
         </label>
         <button
           type="submit"
           className="action-button"
           disabled={submitting || !canSaveAccount}
-          title={canSaveAccount ? "Save account" : formReadiness.missingFields.join(", ")}
+          title={canSaveAccount ? "?? ??" : formReadiness.missingFields.join(", ")}
         >
-          {submitting ? "Saving..." : canSaveAccount ? "Save Account" : "Fill Required Fields"}
+          {submitting ? "?? ?..." : canSaveAccount ? "?? ??" : "?? ?? ?? ??"}
         </button>
       </form>
       <div className="form-readiness-card">
         <div className="section-heading">
           <div>
-            <p className="eyebrow">Form Preview</p>
-            <h3>Current Test Readiness</h3>
+            <p className="eyebrow">?? ????</p>
+            <h3>?? ??? ?? ??</h3>
           </div>
           <StatusBadge value={formReadiness.state} />
         </div>
@@ -605,59 +605,59 @@ function ApiAccountsView({
         </div>
         <label className="filter-toggle">
           <input type="checkbox" checked={activeOnly} onChange={(event) => setActiveOnly(event.target.checked)} />
-          <span>Active only</span>
+          <span>?? ??? ??</span>
         </label>
       </div>
       <div className="account-filter-summary">
-        <strong>{filteredAccounts.length}</strong> of {accounts.length} accounts shown
+        <strong>{filteredAccounts.length}</strong> / {accounts.length}? ?? ?? ?
         {accountScopeSummary && <span className="account-scope-note">{accountScopeSummary}</span>}
       </div>
       <DataGrid
         columns={[
           { key: "name", title: "Account", width: 180, sticky: true },
-          { key: "type", title: "Type", width: 120 },
-          { key: "clientIdMasked", title: "Client ID", width: 160 },
-          { key: "clientSecretMasked", title: "Client Secret", width: 180 },
-          { key: "storeId", title: "Store ID", width: 140 },
-          { key: "channelId", title: "Channel ID", width: 140 },
+          { key: "type", title: "??", width: 120 },
+          { key: "clientIdMasked", title: "????? ID", width: 160 },
+          { key: "clientSecretMasked", title: "????? ???", width: 180 },
+          { key: "storeId", title: "??? ID", width: 140 },
+          { key: "channelId", title: "?? ID", width: 140 },
           {
             key: "readiness",
-            title: "Readiness",
+            title: "?? ??",
             width: 150,
             render: (row) => <StatusBadge value={getAccountReadinessState(row)} />
           },
           {
             key: "readinessHint",
-            title: "Test Mode",
+            title: "??? ??",
             width: 220,
             render: (row) => getAccountReadinessHint(row)
           },
           {
             key: "lastTestSummary",
-            title: "Latest Test",
+            title: "?? ???",
             width: 260,
             render: (row) => row.lastTestSummary ?? "-"
           },
           {
             key: "connectionStatus",
-            title: "Status",
+            title: "??",
             width: 120,
             render: (row) => <StatusBadge value={row.connectionStatus} />
           },
           {
             key: "isActive",
-            title: "Active",
+            title: "??",
             width: 100,
             render: (row) => <StatusBadge value={row.isActive ? "CONNECTED" : "PAUSED"} />
           },
           {
             key: "actions",
-            title: "Actions",
+            title: "??",
             width: 240,
             render: (row) => {
               const readiness = getAccountReadinessState(row);
               const canTest = readiness !== "INCOMPLETE";
-              const testLabel = readiness === "LIVE_READY" ? "Run Live Test" : "Run Validation Check";
+              const testLabel = readiness === "LIVE_READY" ? "??? ??? ??" : "?? ?? ??";
 
               return (
                 <div className="inline-actions">
@@ -671,7 +671,7 @@ function ApiAccountsView({
                     {testLabel}
                   </button>
                   <button type="button" className="action-button secondary" onClick={() => void onToggleAccount(row)}>
-                    {row.isActive ? "Deactivate" : "Activate"}
+                    {row.isActive ? "????" : "???"}
                   </button>
                 </div>
               );
@@ -683,8 +683,8 @@ function ApiAccountsView({
       <div className="log-panel">
         <div className="section-heading">
           <div>
-            <p className="eyebrow">Test History</p>
-            <h3>Recent API Account Test Logs</h3>
+            <p className="eyebrow">??? ??</p>
+            <h3>?? API ?? ??? ??</h3>
           </div>
         </div>
         <div className="account-filter-bar log-filter-bar">
@@ -701,7 +701,7 @@ function ApiAccountsView({
             ))}
           </div>
           <div className="account-filter-summary">
-            <strong>{filteredLogRows.length}</strong> of {recentAccountTestLogs.length} logs shown
+            <strong>{filteredLogRows.length}</strong> / {recentAccountTestLogs.length}? ?? ?? ?
           </div>
         </div>
         {recentAccountTestLogs.length === 0 ? (
@@ -719,13 +719,13 @@ function ApiAccountsView({
                 sticky: true,
                 render: (row) => formatDateTime(row.createdAt)
               },
-              { key: "level", title: "Level", width: 100, render: (row) => <StatusBadge value={row.level} /> },
-              { key: "outcome", title: "Outcome", width: 120, render: (row) => <StatusBadge value={row.outcome} /> },
-              { key: "testMode", title: "Mode", width: 130, render: (row) => <StatusBadge value={row.testMode} /> },
-              { key: "message", title: "Message", width: 320 },
+              { key: "level", title: "??", width: 100, render: (row) => <StatusBadge value={row.level} /> },
+              { key: "outcome", title: "??", width: 120, render: (row) => <StatusBadge value={row.outcome} /> },
+              { key: "testMode", title: "??", width: 130, render: (row) => <StatusBadge value={row.testMode} /> },
+              { key: "message", title: "???", width: 320 },
               {
                 key: "detailSummary",
-                title: "Details",
+                title: "??",
                 width: 360,
                 render: (row) => row.detailSummary
               }
@@ -1013,7 +1013,7 @@ function ReportsView({ snapshot }: { snapshot: AppSnapshot }) {
               { key: "productTitle", title: "Product", width: 260 },
               {
                 key: "status",
-                title: "Status",
+                title: "??",
                 width: 120,
                 render: (row) => <StatusBadge value={row.status} />
               },
@@ -1185,36 +1185,36 @@ function downloadCsv(fileName: string, csvText: string) {
 function buildFieldHints(type: ApiAccountFormInput["type"]): FieldHintMap {
   return {
     name: {
-      placeholder: type === "SEARCH_AD" ? "e.g. Main SearchAd Account" : type === "COMMERCE" ? "e.g. Smartstore Commerce Account" : "e.g. Internal Integration Account",
-      helper: "Use a name your team can recognize quickly."
+      placeholder: type === "SEARCH_AD" ? "?: ?? ???? ??" : type === "COMMERCE" ? "?: ?????? ??? ??" : "?: ?? ?? ??",
+      helper: "?? ?? ??? ? ?? ???? ?????."
     },
     clientId: {
-      placeholder: "Enter the issued client ID",
-      helper: "Copy the value exactly as issued by the provider."
+      placeholder: "??? ????? ID ??",
+      helper: "????? ??? ?? ??? ?????."
     },
     clientSecret: {
-      placeholder: "Enter the issued client secret",
-      helper: "Paste the secret carefully without trimming internal characters."
+      placeholder: "??? ????? ??? ??",
+      helper: "?? ??? ??? ??? ??? ??????."
     },
     accessLicense: {
-      placeholder: type === "SEARCH_AD" ? "SearchAd access license" : "Commerce access license",
-      helper: type === "SEARCH_AD" ? "Required for the SearchAd live test." : "Required for commerce validation and future live calls."
+      placeholder: type === "SEARCH_AD" ? "???? ??? ????" : "??? ??? ????",
+      helper: type === "SEARCH_AD" ? "???? ??? ???? ?????." : "??? ?? ? ?? ??? ??? ?????."
     },
     secretKey: {
-      placeholder: type === "SEARCH_AD" ? "SearchAd secret key" : "Commerce secret key",
-      helper: type === "SEARCH_AD" ? "Used to sign the live SearchAd request." : "Needed for commerce validation and future live calls."
+      placeholder: type === "SEARCH_AD" ? "???? ??? ?" : "??? ??? ?",
+      helper: type === "SEARCH_AD" ? "???? ??? ?? ??? ?????." : "??? ?? ? ?? ??? ??? ?????."
     },
     customerId: {
-      placeholder: "SearchAd customer ID",
-      helper: "Only needed for SearchAd live testing."
+      placeholder: "???? ?? ID",
+      helper: "???? ??? ?????? ?????."
     },
     storeId: {
-      placeholder: "Commerce store ID",
-      helper: "Use this if your commerce integration is store-based."
+      placeholder: "??? ??? ID",
+      helper: "??? ?? ??? ???? ? ?? ?????."
     },
     channelId: {
-      placeholder: "Commerce channel ID",
-      helper: "Use this if your commerce integration is channel-based."
+      placeholder: "??? ?? ID",
+      helper: "?? ?? ??? ???? ? ?? ?????."
     }
   };
 }
@@ -1224,28 +1224,28 @@ function buildNextActionGuide(accounts: ApiAccount[], formReadiness: FormReadine
 
   if (liveReadyAccounts.length > 0) {
     return {
-      title: "Run a live SearchAd connection test.",
-      description: `At least ${liveReadyAccounts.length} saved account is ready for a real external test. Use Run Live Test from the table below.`
+      title: "???? ??? ???? ?????.",
+      description: `??? ?? ? ${liveReadyAccounts.length}?? ?? ?? ???? ?????. ?? ??? ??? ???? ?????.`
     };
   }
 
   if (formReadiness.state === "LIVE_READY") {
     return {
-      title: "Save this account, then run a live test.",
-      description: "The current SEARCH_AD form is complete enough for an immediate real connection check."
+      title: "? ??? ??? ? ??? ???? ?????.",
+      description: "?? SEARCH_AD ???? ?? ?? ?? ??? ??? ? ?? ?????."
     };
   }
 
   if (formReadiness.state === "VALIDATION_READY") {
     return {
-      title: "Save this account for the current validation flow.",
-      description: currentType === "COMMERCE" ? "Commerce accounts can be stored now and validated, then upgraded to live adapter testing later." : "This account is ready for the current non-live validation path."
+      title: "?? ?? ????? ? ??? ?????.",
+      description: currentType === "COMMERCE" ? "??? ??? ?? ???? ??? ?, ?? ??? ??? ???? ??? ? ????." : "? ??? ?? ???? ?? ??? ??? ? ????."
     };
   }
 
   return {
-    title: "Complete the highlighted required fields first.",
-    description: `The form still needs ${formReadiness.missingFields.length} required field${formReadiness.missingFields.length === 1 ? "" : "s"} before save and test can continue.`
+    title: "??? ?? ??? ?? ?????.",
+    description: `??? ???? ????? ?? ?? ${formReadiness.missingFields.length}?? ? ???? ???.`
   };
 }
 
@@ -1259,21 +1259,21 @@ function renderFieldLabel(requirementKey: string, requiredFieldSet: Set<string>,
   const label = displayLabel ?? requirementKey;
   return (
     <>
-      {label} <em className={isRequired ? "field-badge required" : "field-badge optional"}>{isRequired ? "Required" : "Optional"}</em>
+      {label} <em className={isRequired ? "field-badge required" : "field-badge optional"}>{isRequired ? "??" : "??"}</em>
     </>
   );
 }
 
 function getCurrentRequiredFields(type: ApiAccountFormInput["type"]) {
   if (type === "SEARCH_AD") {
-    return ["Account Name", "Client ID", "Client Secret", "Access License", "Secret Key", "Customer ID"];
+    return ["???", "????? ID", "????? ???", "??? ????", "??? ?", "?? ID"];
   }
 
   if (type === "COMMERCE") {
-    return ["Account Name", "Client ID", "Client Secret", "Access License", "Secret Key", "Store ID or Channel ID"];
+    return ["???", "????? ID", "????? ???", "??? ????", "??? ?", "??? ID ?? ?? ID"];
   }
 
-  return ["Account Name", "Client ID", "Client Secret"];
+  return ["???", "????? ID", "????? ???"];
 }
 
 function buildFormReadinessPreview(input: ApiAccountFormInput): FormReadinessPreview {
@@ -1282,8 +1282,8 @@ function buildFormReadinessPreview(input: ApiAccountFormInput): FormReadinessPre
   if (input.type === "SEARCH_AD" && missingFields.length === 0) {
     return {
       state: "LIVE_READY",
-      title: "This account can be saved and tested with a real SearchAd connection right away.",
-      caption: "All required SearchAd fields are present.",
+      title: "? ??? ?? ?? ? ?? ???? ?? ???? ??? ? ????.",
+      caption: "???? ?? ??? ?? ???????.",
       missingFields
     };
   }
@@ -1291,16 +1291,16 @@ function buildFormReadinessPreview(input: ApiAccountFormInput): FormReadinessPre
   if (input.type !== "SEARCH_AD" && missingFields.length === 0) {
     return {
       state: "VALIDATION_READY",
-      title: "This account is ready for the current validation flow.",
-      caption: input.type === "COMMERCE" ? "Live commerce calls are still a follow-up task." : "Custom accounts currently use basic validation only.",
+      title: "? ??? ?? ?? ??? ??? ??? ?????.",
+      caption: input.type === "COMMERCE" ? "??? ??? ??? ?? ?? ?????." : "??? ??? ?? ?? ??? ?????.",
       missingFields
     };
   }
 
   return {
     state: "INCOMPLETE",
-    title: "More fields are needed before this account can be tested.",
-    caption: `Missing ${missingFields.length} required field${missingFields.length === 1 ? "" : "s"}.`,
+    title: "? ??? ?????? ?? ??? ?????.",
+    caption: `?? ?? ${missingFields.length}?? ???????.`,
     missingFields
   };
 }
@@ -1309,38 +1309,38 @@ function getFormMissingFields(input: ApiAccountFormInput) {
   const missingFields: string[] = [];
 
   if (!input.name.trim()) {
-    missingFields.push("Account Name");
+    missingFields.push("???");
   }
 
   if (!input.clientId.trim()) {
-    missingFields.push("Client ID");
+    missingFields.push("????? ID");
   }
 
   if (!input.clientSecret.trim()) {
-    missingFields.push("Client Secret");
+    missingFields.push("????? ???");
   }
 
   if (input.type === "SEARCH_AD") {
     if (!(input.accessLicense ?? "").trim()) {
-      missingFields.push("Access License");
+      missingFields.push("??? ????");
     }
     if (!(input.secretKey ?? "").trim()) {
-      missingFields.push("Secret Key");
+      missingFields.push("??? ?");
     }
     if (!(input.customerId ?? "").trim()) {
-      missingFields.push("Customer ID");
+      missingFields.push("?? ID");
     }
   }
 
   if (input.type === "COMMERCE") {
     if (!(input.accessLicense ?? "").trim()) {
-      missingFields.push("Access License");
+      missingFields.push("??? ????");
     }
     if (!(input.secretKey ?? "").trim()) {
-      missingFields.push("Secret Key");
+      missingFields.push("??? ?");
     }
     if (!(input.storeId ?? "").trim() && !(input.channelId ?? "").trim()) {
-      missingFields.push("Store ID or Channel ID");
+      missingFields.push("??? ID ?? ?? ID");
     }
   }
 
@@ -1364,53 +1364,53 @@ function getAccountReadinessHint(account: ApiAccount) {
 
   if (account.type === "SEARCH_AD") {
     return isLiveReadySearchAdAccount(account)
-      ? "Real external test available"
-      : `Missing: ${missingFields.join(", ")}`;
+      ? "?? ?? ??? ??"
+      : `??: ${missingFields.join(", ")}`;
   }
 
   if (account.type === "COMMERCE") {
     return isValidationReadyAccount(account)
-      ? "Validation-only check available"
-      : `Missing: ${missingFields.join(", ")}`;
+      ? "?? ?? ?? ??"
+      : `??: ${missingFields.join(", ")}`;
   }
 
   return isValidationReadyAccount(account)
-    ? "Basic validation available"
-    : `Missing: ${missingFields.join(", ")}`;
+    ? "?? ?? ??"
+    : `??: ${missingFields.join(", ")}`;
 }
 
 function getAccountMissingFields(account: ApiAccount) {
   const missingFields: string[] = [];
 
   if (!account.clientIdMasked) {
-    missingFields.push("Client ID");
+    missingFields.push("????? ID");
   }
 
   if (!account.clientSecretMasked) {
-    missingFields.push("Client Secret");
+    missingFields.push("????? ???");
   }
 
   if (account.type === "SEARCH_AD") {
     if (!account.accessLicenseMasked) {
-      missingFields.push("Access License");
+      missingFields.push("??? ????");
     }
     if (!account.secretKeyMasked) {
-      missingFields.push("Secret Key");
+      missingFields.push("??? ?");
     }
     if (!account.customerId) {
-      missingFields.push("Customer ID");
+      missingFields.push("?? ID");
     }
   }
 
   if (account.type === "COMMERCE") {
     if (!account.accessLicenseMasked) {
-      missingFields.push("Access License");
+      missingFields.push("??? ????");
     }
     if (!account.secretKeyMasked) {
-      missingFields.push("Secret Key");
+      missingFields.push("??? ?");
     }
     if (!account.storeId && !account.channelId) {
-      missingFields.push("Store ID or Channel ID");
+      missingFields.push("??? ID ?? ?? ID");
     }
   }
 
@@ -1424,24 +1424,24 @@ function buildAccountReadinessSummary(accounts: ApiAccount[], recentLogCount: nu
 
   return [
     {
-      label: "Saved Accounts",
+      label: "??? ??",
       value: accounts.length,
-      caption: `${activeCount} active`
+      caption: `?? ${activeCount}?`
     },
     {
-      label: "Live Ready",
+      label: "???? ??",
       value: liveReadyCount,
-      caption: "SEARCH_AD credentials complete"
+      caption: "SEARCH_AD ???? ?? ??"
     },
     {
-      label: "Validation Ready",
+      label: "?? ??",
       value: validationReadyCount,
-      caption: "Ready for non-live checks"
+      caption: "???? ?? ??"
     },
     {
-      label: "Recent Tests",
+      label: "?? ???",
       value: recentLogCount,
-      caption: "Latest connection log rows"
+      caption: "?? ?? ?? ??"
     }
   ];
 }
@@ -1454,30 +1454,30 @@ function buildAccountLogFocusCards(logs: AccountTestLogViewRow[]): AccountLogFoc
 
   return [
     {
-      label: "Recent Failed",
+      label: "?? ??",
       value: failedCount,
-      caption: failedCount > 0 ? "Review credentials or connection errors first" : "No recent failures in the latest log window",
+      caption: failedCount > 0 ? "???? ?? ?? ??? ?? ?????" : "?? ?? ??? ?? ??? ????.",
       toneClass: "failed",
       filterValue: "FAILED"
     },
     {
-      label: "Recent Success",
+      label: "?? ??",
       value: successCount,
-      caption: successCount > 0 ? "Healthy connection checks completed recently" : "No recent successful checks recorded yet",
+      caption: successCount > 0 ? "?? ?? ??? ?? ???????." : "?? ?? ?? ?? ??? ????.",
       toneClass: "success",
       filterValue: "SUCCESS"
     },
     {
-      label: "Real Mode",
+      label: "??? ??",
       value: realCount,
-      caption: realCount > 0 ? "Live SearchAd checks were executed" : "No live external test in the recent log window",
+      caption: realCount > 0 ? "?? ???? ??? ???????." : "?? ?? ??? ??? ???? ????.",
       toneClass: "info",
       filterValue: "REAL"
     },
     {
-      label: "Validation Mode",
+      label: "?? ??",
       value: validationCount,
-      caption: "Non-live checks useful before production credentials",
+      caption: "?? ???? ?? ? ????? ?????.",
       toneClass: "warning",
       filterValue: "VALIDATION"
     }
@@ -1526,9 +1526,9 @@ function parseApiAccountTestMeta(metaJson?: string | null): ParsedApiAccountTest
 
 function formatParsedApiAccountTestMeta(parsed: ParsedApiAccountTestMeta, fallback?: string | null) {
   const parts = [
-    parsed.accountType ? `type=${parsed.accountType}` : "",
-    parsed.mode ? `mode=${parsed.mode}` : "",
-    typeof parsed.statusCode === "number" ? `status=${parsed.statusCode}` : "",
+    parsed.accountType ? `??=${parsed.accountType}` : "",
+    parsed.mode ? `??=${parsed.mode}` : "",
+    typeof parsed.statusCode === "number" ? `??=${parsed.statusCode}` : "",
     parsed.details ? String(parsed.details).slice(0, 120) : ""
   ].filter(Boolean);
 

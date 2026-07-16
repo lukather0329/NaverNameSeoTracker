@@ -1,4 +1,4 @@
-:root {
+﻿:root {
   font-family: "Segoe UI", "Pretendard", sans-serif;
   color: #1d2838;
   background:
@@ -110,7 +110,8 @@ button {
   box-shadow: 0 18px 60px rgba(44, 67, 96, 0.08);
 }
 
-.hero {
+.hero,
+.report-hero {
   grid-template-columns: minmax(0, 1fr) 320px;
   align-items: center;
 }
@@ -127,6 +128,19 @@ button {
 
 .metric-card strong {
   font-size: 36px;
+}
+
+.metric-card small {
+  color: #6a7486;
+}
+
+.tone-card {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(250, 240, 225, 0.88));
+}
+
+.report-layout {
+  gap: 20px;
 }
 
 .sparkline {
@@ -172,6 +186,13 @@ button {
 .section-heading {
   display: flex;
   justify-content: space-between;
+  align-items: center;
+}
+
+.inline-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
   align-items: center;
 }
 
@@ -280,7 +301,12 @@ button {
     gap: 18px;
   }
 
-  .hero {
+  .hero,
+  .report-hero {
     grid-template-columns: 1fr;
+  }
+
+  .content {
+    padding: 18px;
   }
 }

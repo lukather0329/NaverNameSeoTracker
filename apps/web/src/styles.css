@@ -463,6 +463,37 @@ select {
   color: var(--text-soft);
 }
 
+
+.field-required {
+  color: var(--text-main) !important;
+}
+
+.field-optional {
+  opacity: 0.72;
+}
+
+.field-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.field-badge.required {
+  color: #4318ff;
+  background: rgba(117, 81, 255, 0.12);
+}
+
+.field-badge.optional {
+  color: var(--text-soft);
+  background: rgba(224, 229, 250, 0.88);
+}
+
 .account-form input,
 .account-form select {
   width: 100%;

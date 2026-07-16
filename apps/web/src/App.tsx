@@ -953,15 +953,61 @@ function getAccountReadinessState(account: ApiAccount): AccountReadinessState {
 }
 
 function getAccountReadinessHint(account: ApiAccount) {
+  const missingFields = getAccountMissingFields(account);
+
   if (account.type === "SEARCH_AD") {
-    return isLiveReadySearchAdAccount(account) ? "Real external test available" : "Missing fields for live SearchAd test";
+    return isLiveReadySearchAdAccount(account)
+      ? "Real external test available"
+      : `Missing: ${missingFields.join(", ")}`;
   }
 
   if (account.type === "COMMERCE") {
-    return isValidationReadyAccount(account) ? "Validation-only check available" : "Add commerce credential fields";
+    return isValidationReadyAccount(account)
+      ? "Validation-only check available"
+      : `Missing: ${missingFields.join(", ")}`;
   }
 
-  return isValidationReadyAccount(account) ? "Basic validation available" : "Client ID and Secret required";
+  return isValidationReadyAccount(account)
+    ? "Basic validation available"
+    : `Missing: ${missingFields.join(", ")}`;
+}
+
+function getAccountMissingFields(account: ApiAccount) {
+  const missingFields: string[] = [];
+
+  if (!account.clientIdMasked) {
+    missingFields.push("Client ID");
+  }
+
+  if (!account.clientSecretMasked) {
+    missingFields.push("Client Secret");
+  }
+
+  if (account.type === "SEARCH_AD") {
+    if (!account.accessLicenseMasked) {
+      missingFields.push("Access License");
+    }
+    if (!account.secretKeyMasked) {
+      missingFields.push("Secret Key");
+    }
+    if (!account.customerId) {
+      missingFields.push("Customer ID");
+    }
+  }
+
+  if (account.type === "COMMERCE") {
+    if (!account.accessLicenseMasked) {
+      missingFields.push("Access License");
+    }
+    if (!account.secretKeyMasked) {
+      missingFields.push("Secret Key");
+    }
+    if (!account.storeId && !account.channelId) {
+      missingFields.push("Store ID or Channel ID");
+    }
+  }
+
+  return missingFields;
 }
 
 function buildAccountReadinessSummary(accounts: ApiAccount[], recentLogCount: number): AccountReadinessSummary[] {

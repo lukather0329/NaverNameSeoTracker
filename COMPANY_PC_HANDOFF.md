@@ -23,6 +23,7 @@ Current focus branch: `feature/reports`
   - current working branch
   - added report screen, summary cards, experiment report table, CSV export flow
   - workspace build verified on 2026-07-16 with `npm run build`
+  - local API health and snapshot verified after dotenv/prisma bootstrap fix on 2026-07-16
 
 ## 2. First steps on company PC
 
@@ -42,17 +43,19 @@ git pull origin feature/reports
 - CSV export for ranking results
 - shared/package/server/web TypeScript build blockers fixed
 - Vite env typing and workspace build scripts aligned
+- server dotenv load order fixed so Prisma reads `DATABASE_URL` during runtime
 
 ## 4. Recommended next work order
 
 1. Verify `feature/reports` UI rendering in browser.
 2. Test both CSV downloads with real snapshot data.
-3. Backfill report APIs or server-side export if needed.
+3. Seed sample data or connect real local DB data.
 4. Merge validated feature branches into `dev`.
 
 ## 5. Report branch verification checklist
 
 - run `npm run build` once and confirm success
+- create `.env` from `ENV.example` if local env file is missing
 - open the app and click `리포트`
 - confirm summary cards render
 - confirm experiment table data matches current snapshot
@@ -68,6 +71,7 @@ git checkout feature/reports
 git pull origin feature/reports
 npm install
 npm run build
+npm run prisma:generate
 npm run dev
 ```
 
@@ -77,4 +81,5 @@ npm run dev
 - add experiment/product filters
 - move CSV generation to server endpoint if file volume grows
 - add management summary section for weekly reporting
+- seed representative sample data for report demo
 - merge report view with rank-tracking improvements if needed

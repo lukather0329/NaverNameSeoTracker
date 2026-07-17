@@ -973,6 +973,7 @@ function ReportsView({ snapshot }: { snapshot: AppSnapshot }) {
   const effectiveReportCount = sortedRows.filter((row) => row.judgement === "EFFECTIVE").length;
   const worseReportCount = sortedRows.filter((row) => row.judgement === "WORSE").length;
   const completedReportCount = sortedRows.filter((row) => row.status === "COMPLETED").length;
+  const runningReportCount = sortedRows.filter((row) => row.status === "RUNNING").length;
   const summaryCards = buildReportSummary(snapshot, filteredRows, filteredResults);
   const filterScopeLabel = buildTrackedScopeLabel(windowFilter, startDateFilter, endDateFilter);
   const managementSummary = buildReportManagementSummary(sortedRows, filteredResults, filterScopeLabel);
@@ -1188,6 +1189,7 @@ function ReportsView({ snapshot }: { snapshot: AppSnapshot }) {
             <span className="filter-summary">효과 있음 {effectiveReportCount}개</span>
             <span className="filter-summary">악화 {worseReportCount}개</span>
             <span className="filter-summary">완료 {completedReportCount}개</span>
+            <span className="filter-summary">진행 중 {runningReportCount}개</span>
             <button type="button" className="action-button secondary" onClick={resetFilters}>
               필터 초기화
             </button>

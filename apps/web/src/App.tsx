@@ -996,6 +996,15 @@ function ReportsView({ snapshot }: { snapshot: AppSnapshot }) {
     selectedPresetName,
     resultCount: sortedRows.length
   });
+  const appliedReportFilters = buildAppliedReportFilters({
+    searchQuery,
+    productFilter,
+    experimentFilter,
+    statusFilter,
+    judgementFilter,
+    filterScopeLabel,
+    selectedPresetName
+  });
 
   function resetFilters() {
     setStatusFilter("ALL");
@@ -1353,6 +1362,18 @@ function ReportsView({ snapshot }: { snapshot: AppSnapshot }) {
             <h2>실험 리포트 테이블</h2>
           </div>
         </div>
+        {appliedReportFilters.length > 0 ? (
+          <div className="account-filter-summary report-filter-summary-block">
+            <strong>적용 중인 필터</strong>
+            <div className="guide-chip-row report-filter-chip-row">
+              {appliedReportFilters.map((item) => (
+                <span key={item} className="guide-chip muted">
+                  {item}
+                </span>
+              ))}
+            </div>
+          </div>
+        ) : null}
         {sortedRows.length === 0 ? (
           <div className="empty-state-card">
             <strong>{hasInvalidDateRange ? "잘못된 날짜 범위로 인해 리포트 행을 표시할 수 없습니다." : "현재 필터와 일치하는 리포트 행이 없습니다."}</strong>
@@ -1578,6 +1599,48 @@ async function copyTextToClipboard(text: string) {
   if (!copied) {
     throw new Error("copy failed");
   }
+}
+
+function buildAppliedReportFilters(input: {
+  searchQuery: string;
+  productFilter: string;
+  experimentFilter: string;
+  statusFilter: string;
+  judgementFilter: string;
+  filterScopeLabel: string;
+  selectedPresetName: string;
+}) {
+  const filters: string[] = [];
+
+  if (input.selectedPresetName) {
+    filters.push(`프리셋: ${input.selectedPresetName}`);
+  }
+
+  if (input.searchQuery.trim()) {
+    filters.push(`검색: ${input.searchQuery.trim()}`);
+  }
+
+  if (input.productFilter !== "ALL") {
+    filters.push(`상품: ${input.productFilter}`);
+  }
+
+  if (input.experimentFilter !== "ALL") {
+    filters.push(`실험: ${input.experimentFilter}`);
+  }
+
+  if (input.statusFilter !== "ALL") {
+    filters.push(`상태: ${input.statusFilter}`);
+  }
+
+  if (input.judgementFilter !== "ALL") {
+    filters.push(`판단: ${input.judgementFilter}`);
+  }
+
+  if (input.filterScopeLabel !== "전체 기간") {
+    filters.push(`범위: ${input.filterScopeLabel}`);
+  }
+
+  return filters;
 }
 
 function buildTrackedScopeLabel(windowFilter: string, startDateFilter: string, endDateFilter: string) {

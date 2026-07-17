@@ -125,3 +125,4 @@ npm run dev
 - `feature/reports` is in late-stage polish, not open-ended exploration.
 - The branch already covers the expected report UX surface for MVP verification.
 - The next meaningful milestone is branch validation and merge readiness, not more endless UI churn.
+- Use [REPORT_MERGE_CHECKLIST.md](D:\Codex\NaverNameSeoTracker\REPORT_MERGE_CHECKLIST.md) as the pass/fail checklist before merging into dev.

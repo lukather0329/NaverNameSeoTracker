@@ -1007,6 +1007,7 @@ function ReportsView({ snapshot }: { snapshot: AppSnapshot }) {
     statusFilter,
     judgementFilter,
     filterScopeLabel,
+    reportSortSummaryLabel,
     selectedPresetName
   });
 
@@ -1192,7 +1193,7 @@ function ReportsView({ snapshot }: { snapshot: AppSnapshot }) {
             <span className="filter-summary">완료 {completedReportCount}개</span>
             <span className="filter-summary">진행 중 {runningReportCount}개</span>
             </div>
-            <button type="button" className="action-button secondary" onClick={resetFilters}>
+            <button type="button" className="action-button secondary" onClick={resetFilters} disabled={appliedReportFilters.length === 0}>
               필터 초기화
             </button>
           </div>
@@ -1637,6 +1638,7 @@ function buildAppliedReportFilters(input: {
   statusFilter: string;
   judgementFilter: string;
   filterScopeLabel: string;
+  reportSortSummaryLabel: string;
   selectedPresetName: string;
 }) {
   const filters: string[] = [];
@@ -1663,6 +1665,10 @@ function buildAppliedReportFilters(input: {
 
   if (input.judgementFilter !== "ALL") {
     filters.push(`판단: ${input.judgementFilter}`);
+  }
+
+  if (input.reportSortSummaryLabel !== "최신 추적순") {
+    filters.push(`정렬: ${input.reportSortSummaryLabel}`);
   }
 
   if (input.filterScopeLabel !== "전체 기간") {

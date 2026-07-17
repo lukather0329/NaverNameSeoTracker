@@ -88,6 +88,14 @@ type ExperimentReportRow = {
   trackedAt: string;
   trackedAtValue?: string;
 };
+type ReportManagementSummary = {
+  headline: string;
+  points: Array<{
+    label: string;
+    text: string;
+  }>;
+  footer: string;
+};
 
 const navItems: Array<{ key: ViewKey; label: string }> = [
   { key: "dashboard", label: "대시보드" },
@@ -913,6 +921,7 @@ function ReportsView({ snapshot }: { snapshot: AppSnapshot }) {
   const [judgementFilter, setJudgementFilter] = useState<string>("ALL");
   const [windowFilter, setWindowFilter] = useState<string>("ALL");
   const [sortKey, setSortKey] = useState<"LATEST_TRACKED" | "BEST_RANK" | "BEST_DELTA" | "BEST_UP_RATE" | "NAME">("LATEST_TRACKED");
+  const [copyFeedback, setCopyFeedback] = useState<"IDLE" | "SUCCESS" | "ERROR">("IDLE");
 
   const filteredRows = experimentRows.filter((row) => {
     const normalizedQuery = searchQuery.trim().toLowerCase();
@@ -948,10 +957,12 @@ function ReportsView({ snapshot }: { snapshot: AppSnapshot }) {
     setJudgementFilter("ALL");
     setWindowFilter("ALL");
     setSortKey("LATEST_TRACKED");
+    setCopyFeedback("IDLE");
   }
 
   function applyQuickPreset(preset: "EFFECTIVE" | "RISK" | "COMPLETED" | "ALL") {
     setSearchQuery("");
+    setCopyFeedback("IDLE");
 
     if (preset === "EFFECTIVE") {
       setStatusFilter("RUNNING");
@@ -978,6 +989,15 @@ function ReportsView({ snapshot }: { snapshot: AppSnapshot }) {
     }
 
     resetFilters();
+  }
+
+  async function handleCopyManagementSummary() {
+    try {
+      await copyTextToClipboard(buildManagementSummaryClipboardText(managementSummary));
+      setCopyFeedback("SUCCESS");
+    } catch {
+      setCopyFeedback("ERROR");
+    }
   }
 
   return (
@@ -1102,6 +1122,11 @@ function ReportsView({ snapshot }: { snapshot: AppSnapshot }) {
             <p className="eyebrow">관리 요약</p>
             <h3>회의 공유용 핵심 요약</h3>
             <p className="helper-copy">필터 결과를 기준으로 바로 전달할 수 있는 문장입니다.</p>
+          </div>
+          <div className="inline-actions">
+            <button type="button" className="action-button secondary" onClick={() => void handleCopyManagementSummary()}>
+              {copyFeedback === "SUCCESS" ? "요약 복사 완료" : copyFeedback === "ERROR" ? "복사 다시 시도" : "요약 문구 복사"}
+            </button>
           </div>
         </div>
         <div className="report-briefing-card">
@@ -1239,7 +1264,7 @@ function buildReportManagementSummary(
   experimentRows: ExperimentReportRow[],
   filteredResults: RankTrackingResult[],
   windowFilter: string
-) {
+): ReportManagementSummary {
   if (experimentRows.length === 0) {
     return {
       headline: "현재 필터 조건과 일치하는 실험이 없어 관리 요약을 생성할 수 없습니다.",
@@ -1301,6 +1326,31 @@ function buildReportManagementSummary(
   };
 }
 
+
+function buildManagementSummaryClipboardText(summary: ReportManagementSummary) {
+  return [summary.headline, ...summary.points.map((point) => `${point.label}: ${point.text}`), summary.footer].join("\n");
+}
+
+async function copyTextToClipboard(text: string) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.setAttribute("readonly", "true");
+  textarea.style.position = "fixed";
+  textarea.style.opacity = "0";
+  document.body.appendChild(textarea);
+  textarea.select();
+  const copied = document.execCommand("copy");
+  document.body.removeChild(textarea);
+
+  if (!copied) {
+    throw new Error("copy failed");
+  }
+}
 function matchesTrackedWindow(trackedAtValue: string | undefined, windowFilter: string) {
   if (windowFilter === "ALL" || !trackedAtValue) {
     return true;

@@ -901,6 +901,22 @@ select {
   .card-grid {
     grid-template-columns: 1fr;
   }
+
+  .report-saved-preset-row {
+    grid-template-columns: 1fr;
+  }
+
+  .report-saved-preset-row .action-button,
+  .empty-state-actions .action-button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .report-active-preset-row,
+  .empty-state-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
 }
 .report-filter-panel {
   gap: 16px;

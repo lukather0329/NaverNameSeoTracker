@@ -924,6 +924,7 @@ function ReportsView({ snapshot }: { snapshot: AppSnapshot }) {
   const [startDateFilter, setStartDateFilter] = useState("");
   const [endDateFilter, setEndDateFilter] = useState("");
   const [copyFeedback, setCopyFeedback] = useState<"IDLE" | "SUCCESS" | "ERROR">("IDLE");
+  const hasInvalidDateRange = Boolean(startDateFilter && endDateFilter && startDateFilter > endDateFilter);
 
   const filteredRows = experimentRows.filter((row) => {
     const normalizedQuery = searchQuery.trim().toLowerCase();
@@ -1122,6 +1123,12 @@ function ReportsView({ snapshot }: { snapshot: AppSnapshot }) {
             </select>
           </label>
         </div>
+        {hasInvalidDateRange ? (
+          <div className="report-filter-warning">
+            <strong>날짜 범위를 다시 확인하세요.</strong>
+            <p>시작일은 종료일보다 같거나 빨라야 합니다.</p>
+          </div>
+        ) : null}
       </section>
       <div className="card-grid">
         {summaryCards.map((card) => (
@@ -1140,7 +1147,7 @@ function ReportsView({ snapshot }: { snapshot: AppSnapshot }) {
             <p className="helper-copy">필터 결과를 기준으로 바로 전달할 수 있는 문장입니다.</p>
           </div>
           <div className="inline-actions">
-            <button type="button" className="action-button secondary" onClick={() => void handleCopyManagementSummary()}>
+            <button type="button" className="action-button secondary" onClick={() => void handleCopyManagementSummary()} disabled={hasInvalidDateRange}>
               {copyFeedback === "SUCCESS" ? "요약 복사 완료" : copyFeedback === "ERROR" ? "복사 다시 시도" : "요약 문구 복사"}
             </button>
           </div>
@@ -1167,8 +1174,8 @@ function ReportsView({ snapshot }: { snapshot: AppSnapshot }) {
         </div>
         {sortedRows.length === 0 ? (
           <div className="empty-state-card">
-            <strong>현재 필터와 일치하는 리포트 행이 없습니다.</strong>
-            <p>필터를 초기화하거나 추적 기간을 넓혀 다시 확인해보세요.</p>
+            <strong>{hasInvalidDateRange ? "잘못된 날짜 범위로 인해 리포트 행을 표시할 수 없습니다." : "현재 필터와 일치하는 리포트 행이 없습니다."}</strong>
+            <p>{hasInvalidDateRange ? "시작일과 종료일을 다시 설정한 뒤 확인해보세요." : "필터를 초기화하거나 추적 기간을 넓혀 다시 확인해보세요."}</p>
           </div>
         ) : (
           <DataGrid

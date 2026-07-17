@@ -964,6 +964,24 @@ select {
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.98);
 }
+.report-filter-warning {
+  display: grid;
+  gap: 6px;
+  padding: 16px 18px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 176, 32, 0.4);
+  background: rgba(255, 244, 214, 0.72);
+}
+
+.report-filter-warning strong {
+  color: #8a5b00;
+}
+
+.report-filter-warning p {
+  margin: 0;
+  color: #9b6a00;
+}
+
 .filter-summary {
   display: inline-flex;
   align-items: center;

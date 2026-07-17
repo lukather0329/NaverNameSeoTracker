@@ -928,7 +928,7 @@ function ReportsView({ snapshot }: { snapshot: AppSnapshot }) {
   const sortedRows = sortExperimentReportRows(filteredRows, sortKey);
   const filteredExperimentIds = new Set(sortedRows.map((row) => row.id));
   const filteredResults = snapshot.results.filter((row) => filteredExperimentIds.has(row.experimentId));
-  const summaryCards = buildReportSummary(snapshot, filteredRows);
+  const summaryCards = buildReportSummary(snapshot, filteredRows, filteredResults);
 
   const reportSortSummaryLabel =
     sortKey === "LATEST_TRACKED"
@@ -1133,23 +1133,23 @@ function buildExperimentReportRows(
   });
 }
 
-function buildReportSummary(snapshot: AppSnapshot, experimentRows: ExperimentReportRow[]) {
-  const completedCount = snapshot.experiments.filter((item) => item.status === "COMPLETED").length;
-  const effectiveCount = snapshot.experiments.filter((item) => item.judgement === "EFFECTIVE").length;
+function buildReportSummary(snapshot: AppSnapshot, experimentRows: ExperimentReportRow[], filteredResults: RankTrackingResult[]) {
+  const completedCount = experimentRows.filter((item) => item.status === "COMPLETED").length;
+  const effectiveCount = experimentRows.filter((item) => item.judgement === "EFFECTIVE").length;
   const activeJobs = snapshot.jobs.filter((item) => item.isEnabled).length;
-  const trackedKeywords = new Set(snapshot.results.map((item) => item.keyword)).size;
-  const latestTrackedAt = snapshot.results[0]?.trackedAt;
+  const trackedKeywords = new Set(filteredResults.map((item) => item.keyword)).size;
+  const latestTrackedAt = filteredResults[0]?.trackedAt;
 
   return [
     {
       label: "총 실험 수",
-      value: snapshot.experiments.length,
+      value: experimentRows.length,
       caption: `완료 ${completedCount}건`
     },
     {
       label: "유효 실험",
       value: effectiveCount,
-      caption: `${snapshot.experiments.length > 0 ? Math.round((effectiveCount / snapshot.experiments.length) * 100) : 0}% 비중`
+      caption: `${experimentRows.length > 0 ? Math.round((effectiveCount / experimentRows.length) * 100) : 0}% 비중`
     },
     {
       label: "활성 Job",

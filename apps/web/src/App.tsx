@@ -1001,12 +1001,26 @@ function ReportsView({ snapshot }: { snapshot: AppSnapshot }) {
   }
 
   async function handleCopyManagementSummary() {
+    if (hasInvalidDateRange) {
+      setCopyFeedback("ERROR");
+      return;
+    }
+
     try {
       await copyTextToClipboard(buildManagementSummaryClipboardText(managementSummary));
       setCopyFeedback("SUCCESS");
     } catch {
       setCopyFeedback("ERROR");
     }
+  }
+
+  function handleDownloadManagementSummary() {
+    if (hasInvalidDateRange) {
+      setCopyFeedback("ERROR");
+      return;
+    }
+
+    downloadTextFile("report-management-summary.txt", buildManagementSummaryClipboardText(managementSummary));
   }
 
   return (
@@ -1147,6 +1161,9 @@ function ReportsView({ snapshot }: { snapshot: AppSnapshot }) {
             <p className="helper-copy">필터 결과를 기준으로 바로 전달할 수 있는 문장입니다.</p>
           </div>
           <div className="inline-actions">
+            <button type="button" className="action-button secondary" onClick={handleDownloadManagementSummary} disabled={hasInvalidDateRange}>
+              요약 TXT 다운로드
+            </button>
             <button type="button" className="action-button secondary" onClick={() => void handleCopyManagementSummary()} disabled={hasInvalidDateRange}>
               {copyFeedback === "SUCCESS" ? "요약 복사 완료" : copyFeedback === "ERROR" ? "복사 다시 시도" : "요약 문구 복사"}
             </button>
@@ -1562,6 +1579,16 @@ function escapeCsvCell(value: string | number) {
 
 function downloadCsv(fileName: string, csvText: string) {
   const blob = new Blob([`\uFEFF${csvText}`], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = fileName;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
+function downloadTextFile(fileName: string, text: string) {
+  const blob = new Blob([text], { type: "text/plain;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;

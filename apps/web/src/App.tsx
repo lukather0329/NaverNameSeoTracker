@@ -985,6 +985,18 @@ function ReportsView({ snapshot }: { snapshot: AppSnapshot }) {
             ? "상승 비율 높은 순"
             : "실험명 가나다순";
 
+  const reportCsvFilterSummary = buildReportCsvFilterSummary({
+    searchQuery,
+    productFilter,
+    experimentFilter,
+    statusFilter,
+    judgementFilter,
+    filterScopeLabel,
+    reportSortSummaryLabel,
+    selectedPresetName,
+    resultCount: sortedRows.length
+  });
+
   function resetFilters() {
     setStatusFilter("ALL");
     setSearchQuery("");
@@ -1138,14 +1150,14 @@ function ReportsView({ snapshot }: { snapshot: AppSnapshot }) {
           <button
             type="button"
             className="action-button"
-            onClick={() => downloadCsv("experiment-report.csv", buildExperimentCsv(sortedRows))}
+            onClick={() => downloadCsv("experiment-report.csv", buildExperimentCsv(sortedRows, reportCsvFilterSummary))}
           >
             실험 리포트 CSV
           </button>
           <button
             type="button"
             className="action-button"
-            onClick={() => downloadCsv("rank-results.csv", buildResultsCsv(filteredResults, snapshot.products))}
+            onClick={() => downloadCsv("rank-results.csv", buildResultsCsv(filteredResults, snapshot.products, reportCsvFilterSummary))}
           >
             랭킹 결과 CSV
           </button>
@@ -1716,7 +1728,7 @@ function compareNullableNumbers(left: number | null, right: number | null, ascen
   return ascending ? left - right : right - left;
 }
 
-function buildExperimentCsv(rows: ExperimentReportRow[]) {
+function buildExperimentCsv(rows: ExperimentReportRow[], filterSummaryRows: Array<[string, string]> = []) {
   const headers = ["실험명", "상품", "상태", "판단", "주기", "키워드 수", "최신 순위", "평균 변화량", "상승 비율", "마지막 추적"];
   const lines = rows.map((row) => [
     row.name,
@@ -1731,10 +1743,10 @@ function buildExperimentCsv(rows: ExperimentReportRow[]) {
     row.trackedAt
   ]);
 
-  return [headers, ...lines].map((line) => line.map(escapeCsvCell).join(",")).join("\n");
+  return [...buildCsvMetadataLines(filterSummaryRows), headers, ...lines].map((line) => line.map(escapeCsvCell).join(",")).join("\n");
 }
 
-function buildResultsCsv(results: RankTrackingResult[], products: Product[]) {
+function buildResultsCsv(results: RankTrackingResult[], products: Product[], filterSummaryRows: Array<[string, string]> = []) {
   const headers = ["키워드", "상품", "추적 시각", "현재 순위", "이전 순위", "변화량", "상태", "발견 상품명"];
   const lines = results.map((row) => [
     row.keyword,
@@ -1747,7 +1759,39 @@ function buildResultsCsv(results: RankTrackingResult[], products: Product[]) {
     row.foundTitle ?? ""
   ]);
 
-  return [headers, ...lines].map((line) => line.map(escapeCsvCell).join(",")).join("\n");
+  return [...buildCsvMetadataLines(filterSummaryRows), headers, ...lines].map((line) => line.map(escapeCsvCell).join(",")).join("\n");
+}
+
+function buildCsvMetadataLines(filterSummaryRows: Array<[string, string]>) {
+  if (filterSummaryRows.length === 0) {
+    return [] as Array<Array<string>>;
+  }
+
+  return [["리포트 필터", "값"], ...filterSummaryRows, ["", ""]];
+}
+
+function buildReportCsvFilterSummary(input: {
+  searchQuery: string;
+  productFilter: string;
+  experimentFilter: string;
+  statusFilter: string;
+  judgementFilter: string;
+  filterScopeLabel: string;
+  reportSortSummaryLabel: string;
+  selectedPresetName: string;
+  resultCount: number;
+}) {
+  return [
+    ["활성 프리셋", input.selectedPresetName || "없음"],
+    ["검색어", input.searchQuery.trim() || "전체"],
+    ["상품", input.productFilter === "ALL" ? "전체" : input.productFilter],
+    ["실험", input.experimentFilter === "ALL" ? "전체" : input.experimentFilter],
+    ["상태", input.statusFilter === "ALL" ? "전체" : input.statusFilter],
+    ["판단", input.judgementFilter === "ALL" ? "전체" : input.judgementFilter],
+    ["범위", input.filterScopeLabel],
+    ["정렬", input.reportSortSummaryLabel],
+    ["건수", `${input.resultCount}`]
+  ] as Array<[string, string]>;
 }
 
 function escapeCsvCell(value: string | number) {

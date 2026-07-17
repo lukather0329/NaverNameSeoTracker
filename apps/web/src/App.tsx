@@ -100,6 +100,8 @@ type ReportManagementSummary = {
 type ReportFilterPreset = {
   name: string;
   searchQuery: string;
+  productFilter: string;
+  experimentFilter: string;
   statusFilter: string;
   judgementFilter: string;
   windowFilter: string;
@@ -931,6 +933,8 @@ function ReportsView({ snapshot }: { snapshot: AppSnapshot }) {
   const experimentRows = buildExperimentReportRows(snapshot.experiments, snapshot.products, snapshot.results);
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState("");
+  const [productFilter, setProductFilter] = useState<string>("ALL");
+  const [experimentFilter, setExperimentFilter] = useState<string>("ALL");
   const [judgementFilter, setJudgementFilter] = useState<string>("ALL");
   const [windowFilter, setWindowFilter] = useState<string>("ALL");
   const [sortKey, setSortKey] = useState<"LATEST_TRACKED" | "BEST_RANK" | "BEST_DELTA" | "BEST_UP_RATE" | "NAME">("LATEST_TRACKED");
@@ -946,17 +950,22 @@ function ReportsView({ snapshot }: { snapshot: AppSnapshot }) {
     setSavedPresets(loadStoredReportPresets());
   }, []);
 
+  const productFilterOptions = Array.from(new Set(experimentRows.map((row) => row.productTitle))).sort((left, right) => left.localeCompare(right, "ko"));
+  const experimentFilterOptions = Array.from(new Set(experimentRows.map((row) => row.name))).sort((left, right) => left.localeCompare(right, "ko"));
+
   const filteredRows = experimentRows.filter((row) => {
     const normalizedQuery = searchQuery.trim().toLowerCase();
     const searchMatch =
       normalizedQuery.length === 0 ||
       row.name.toLowerCase().includes(normalizedQuery) ||
       row.productTitle.toLowerCase().includes(normalizedQuery);
+    const productMatch = productFilter === "ALL" || row.productTitle === productFilter;
+    const experimentMatch = experimentFilter === "ALL" || row.name === experimentFilter;
     const statusMatch = statusFilter === "ALL" || row.status === statusFilter;
     const judgementMatch = judgementFilter === "ALL" || row.judgement === judgementFilter;
     const windowMatch = matchesTrackedWindow(row.trackedAtValue, windowFilter);
     const dateRangeMatch = matchesTrackedDateRange(row.trackedAtValue, startDateFilter, endDateFilter);
-    return searchMatch && statusMatch && judgementMatch && windowMatch && dateRangeMatch;
+    return searchMatch && productMatch && experimentMatch && statusMatch && judgementMatch && windowMatch && dateRangeMatch;
   });
   const sortedRows = sortExperimentReportRows(filteredRows, sortKey);
   const filteredExperimentIds = new Set(sortedRows.map((row) => row.id));
@@ -979,6 +988,8 @@ function ReportsView({ snapshot }: { snapshot: AppSnapshot }) {
   function resetFilters() {
     setStatusFilter("ALL");
     setSearchQuery("");
+    setProductFilter("ALL");
+    setExperimentFilter("ALL");
     setJudgementFilter("ALL");
     setWindowFilter("ALL");
     setSortKey("LATEST_TRACKED");
@@ -990,6 +1001,8 @@ function ReportsView({ snapshot }: { snapshot: AppSnapshot }) {
 
   function applyQuickPreset(preset: "EFFECTIVE" | "RISK" | "COMPLETED" | "ALL") {
     setSearchQuery("");
+    setProductFilter("ALL");
+    setExperimentFilter("ALL");
     setCopyFeedback("IDLE");
     setStartDateFilter("");
     setEndDateFilter("");
@@ -1026,6 +1039,8 @@ function ReportsView({ snapshot }: { snapshot: AppSnapshot }) {
     return {
       name,
       searchQuery,
+      productFilter,
+      experimentFilter,
       statusFilter,
       judgementFilter,
       windowFilter,
@@ -1038,6 +1053,8 @@ function ReportsView({ snapshot }: { snapshot: AppSnapshot }) {
   function applySavedPreset(preset: ReportFilterPreset) {
     const nextPresets = [preset, ...savedPresets.filter((item) => item.name !== preset.name)].slice(0, 12);
     setSearchQuery(preset.searchQuery);
+    setProductFilter(preset.productFilter ?? "ALL");
+    setExperimentFilter(preset.experimentFilter ?? "ALL");
     setStatusFilter(preset.statusFilter);
     setJudgementFilter(preset.judgementFilter);
     setWindowFilter(preset.windowFilter);
@@ -1200,6 +1217,28 @@ function ReportsView({ snapshot }: { snapshot: AppSnapshot }) {
               placeholder="실험명 또는 상품명"
               onChange={(event) => setSearchQuery(event.target.value)}
             />
+          </label>
+          <label>
+            <span>상품</span>
+            <select value={productFilter} onChange={(event) => setProductFilter(event.target.value)}>
+              <option value="ALL">전체</option>
+              {productFilterOptions.map((productTitle) => (
+                <option key={productTitle} value={productTitle}>
+                  {productTitle}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>실험</span>
+            <select value={experimentFilter} onChange={(event) => setExperimentFilter(event.target.value)}>
+              <option value="ALL">전체</option>
+              {experimentFilterOptions.map((experimentName) => (
+                <option key={experimentName} value={experimentName}>
+                  {experimentName}
+                </option>
+              ))}
+            </select>
           </label>
           <label>
             <span>상태</span>

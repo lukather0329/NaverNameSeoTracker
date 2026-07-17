@@ -940,6 +940,32 @@ select {
   line-height: 1.6;
 }
 
+.report-saved-preset-row {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(180px, 1.2fr) auto minmax(180px, 1fr) auto auto;
+  align-items: end;
+}
+
+.report-preset-field {
+  display: grid;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-soft);
+}
+
+.report-preset-field input,
+.report-preset-field select {
+  width: 100%;
+  min-height: 46px;
+  padding: 12px 14px;
+  color: var(--text-main);
+  border: 1px solid rgba(224, 229, 250, 0.96);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.98);
+}
+
 .report-filters {
   display: grid;
   gap: 14px;

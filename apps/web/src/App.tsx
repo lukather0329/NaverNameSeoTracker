@@ -97,6 +97,19 @@ type ReportManagementSummary = {
   footer: string;
 };
 
+type ReportFilterPreset = {
+  name: string;
+  searchQuery: string;
+  statusFilter: string;
+  judgementFilter: string;
+  windowFilter: string;
+  startDateFilter: string;
+  endDateFilter: string;
+  sortKey: "LATEST_TRACKED" | "BEST_RANK" | "BEST_DELTA" | "BEST_UP_RATE" | "NAME";
+};
+
+const REPORT_FILTER_PRESET_STORAGE_KEY = "naver-seo-report-filter-presets";
+
 const navItems: Array<{ key: ViewKey; label: string }> = [
   { key: "dashboard", label: "대시보드" },
   { key: "accounts", label: "API 계정" },
@@ -924,6 +937,9 @@ function ReportsView({ snapshot }: { snapshot: AppSnapshot }) {
   const [startDateFilter, setStartDateFilter] = useState("");
   const [endDateFilter, setEndDateFilter] = useState("");
   const [copyFeedback, setCopyFeedback] = useState<"IDLE" | "SUCCESS" | "ERROR">("IDLE");
+  const [savedPresetName, setSavedPresetName] = useState("");
+  const [selectedPresetName, setSelectedPresetName] = useState("");
+  const [savedPresets, setSavedPresets] = useState<ReportFilterPreset[]>([]);
   const hasInvalidDateRange = Boolean(startDateFilter && endDateFilter && startDateFilter > endDateFilter);
 
   const filteredRows = experimentRows.filter((row) => {
@@ -964,6 +980,7 @@ function ReportsView({ snapshot }: { snapshot: AppSnapshot }) {
     setSortKey("LATEST_TRACKED");
     setStartDateFilter("");
     setEndDateFilter("");
+    setSelectedPresetName("");
     setCopyFeedback("IDLE");
   }
 
@@ -999,6 +1016,65 @@ function ReportsView({ snapshot }: { snapshot: AppSnapshot }) {
 
     resetFilters();
   }
+
+  function buildCurrentFilterPreset(name: string): ReportFilterPreset {
+    return {
+      name,
+      searchQuery,
+      statusFilter,
+      judgementFilter,
+      windowFilter,
+      startDateFilter,
+      endDateFilter,
+      sortKey
+    };
+  }
+
+  function applySavedPreset(preset: ReportFilterPreset) {
+    setSearchQuery(preset.searchQuery);
+    setStatusFilter(preset.statusFilter);
+    setJudgementFilter(preset.judgementFilter);
+    setWindowFilter(preset.windowFilter);
+    setStartDateFilter(preset.startDateFilter);
+    setEndDateFilter(preset.endDateFilter);
+    setSortKey(preset.sortKey);
+    setSelectedPresetName(preset.name);
+    setCopyFeedback("IDLE");
+  }
+
+  function handleSaveCurrentPreset() {
+    const normalizedName = savedPresetName.trim();
+    if (!normalizedName || hasInvalidDateRange) {
+      return;
+    }
+
+    const nextPresets = [buildCurrentFilterPreset(normalizedName), ...savedPresets.filter((preset) => preset.name !== normalizedName)].slice(0, 12);
+    setSavedPresets(nextPresets);
+    setSelectedPresetName(normalizedName);
+    setSavedPresetName("");
+    persistStoredReportPresets(nextPresets);
+  }
+
+  function handleApplySelectedPreset() {
+    const selectedPreset = savedPresets.find((preset) => preset.name === selectedPresetName);
+    if (!selectedPreset) {
+      return;
+    }
+
+    applySavedPreset(selectedPreset);
+  }
+
+  function handleDeleteSelectedPreset() {
+    if (!selectedPresetName) {
+      return;
+    }
+
+    const nextPresets = savedPresets.filter((preset) => preset.name !== selectedPresetName);
+    setSavedPresets(nextPresets);
+    setSelectedPresetName("");
+    persistStoredReportPresets(nextPresets);
+  }
+
 
   async function handleCopyManagementSummary() {
     if (hasInvalidDateRange) {
@@ -1077,6 +1153,32 @@ function ReportsView({ snapshot }: { snapshot: AppSnapshot }) {
           </button>
           <button type="button" className="filter-chip" onClick={() => applyQuickPreset("ALL")}>
             전체 보기
+          </button>
+        </div>
+        <div className="report-saved-preset-row">
+          <label className="report-preset-field">
+            <span>필터 저장</span>
+            <input value={savedPresetName} placeholder="예: 주간 효과 점검" onChange={(event) => setSavedPresetName(event.target.value)} />
+          </label>
+          <button type="button" className="action-button secondary" onClick={handleSaveCurrentPreset} disabled={!savedPresetName.trim() || hasInvalidDateRange}>
+            현재 필터 저장
+          </button>
+          <label className="report-preset-field">
+            <span>저장된 프리셋</span>
+            <select value={selectedPresetName} onChange={(event) => setSelectedPresetName(event.target.value)}>
+              <option value="">선택</option>
+              {savedPresets.map((preset) => (
+                <option key={preset.name} value={preset.name}>
+                  {preset.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button type="button" className="action-button secondary" onClick={handleApplySelectedPreset} disabled={!selectedPresetName}>
+            불러오기
+          </button>
+          <button type="button" className="action-button secondary" onClick={handleDeleteSelectedPreset} disabled={!selectedPresetName}>
+            삭제
           </button>
         </div>
         <div className="report-filters">
@@ -1298,6 +1400,32 @@ function buildReportSummary(snapshot: AppSnapshot, experimentRows: ExperimentRep
       caption: `${experimentRows.filter((row) => row.avgDelta !== "-").length}개 실험 반영`
     }
   ];
+}
+
+function loadStoredReportPresets(): ReportFilterPreset[] {
+  if (typeof window === "undefined") {
+    return [];
+  }
+
+  try {
+    const raw = window.localStorage.getItem(REPORT_FILTER_PRESET_STORAGE_KEY);
+    if (!raw) {
+      return [];
+    }
+
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function persistStoredReportPresets(presets: ReportFilterPreset[]) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.setItem(REPORT_FILTER_PRESET_STORAGE_KEY, JSON.stringify(presets));
 }
 
 function buildReportManagementSummary(

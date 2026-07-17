@@ -1378,6 +1378,24 @@ function ReportsView({ snapshot }: { snapshot: AppSnapshot }) {
           <div className="empty-state-card">
             <strong>{hasInvalidDateRange ? "잘못된 날짜 범위로 인해 리포트 행을 표시할 수 없습니다." : "현재 필터와 일치하는 리포트 행이 없습니다."}</strong>
             <p>{hasInvalidDateRange ? "시작일과 종료일을 다시 설정한 뒤 확인해보세요." : "필터를 초기화하거나 추적 기간을 넓혀 다시 확인해보세요."}</p>
+            <div className="empty-state-actions">
+              {hasInvalidDateRange ? (
+                <button
+                  type="button"
+                  className="action-button secondary"
+                  onClick={() => {
+                    setStartDateFilter("");
+                    setEndDateFilter("");
+                    setCopyFeedback("IDLE");
+                  }}
+                >
+                  날짜 범위 초기화
+                </button>
+              ) : null}
+              <button type="button" className="action-button secondary" onClick={resetFilters}>
+                전체 필터 초기화
+              </button>
+            </div>
           </div>
         ) : (
           <DataGrid

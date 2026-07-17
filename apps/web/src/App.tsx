@@ -949,6 +949,36 @@ function ReportsView({ snapshot }: { snapshot: AppSnapshot }) {
     setSortKey("LATEST_TRACKED");
   }
 
+  function applyQuickPreset(preset: "EFFECTIVE" | "RISK" | "COMPLETED" | "ALL") {
+    setSearchQuery("");
+
+    if (preset === "EFFECTIVE") {
+      setStatusFilter("RUNNING");
+      setJudgementFilter("EFFECTIVE");
+      setWindowFilter("30D");
+      setSortKey("BEST_DELTA");
+      return;
+    }
+
+    if (preset === "RISK") {
+      setStatusFilter("RUNNING");
+      setJudgementFilter("WORSE");
+      setWindowFilter("30D");
+      setSortKey("BEST_RANK");
+      return;
+    }
+
+    if (preset === "COMPLETED") {
+      setStatusFilter("COMPLETED");
+      setJudgementFilter("ALL");
+      setWindowFilter("90D");
+      setSortKey("LATEST_TRACKED");
+      return;
+    }
+
+    resetFilters();
+  }
+
   return (
     <section className="dashboard report-layout">
       <div className="panel report-hero">
@@ -990,6 +1020,20 @@ function ReportsView({ snapshot }: { snapshot: AppSnapshot }) {
               필터 초기화
             </button>
           </div>
+        </div>
+        <div className="account-filter-chip-row report-preset-row">
+          <button type="button" className="filter-chip" onClick={() => applyQuickPreset("EFFECTIVE")}>
+            효과 확인
+          </button>
+          <button type="button" className="filter-chip" onClick={() => applyQuickPreset("RISK")}>
+            위험 실험
+          </button>
+          <button type="button" className="filter-chip" onClick={() => applyQuickPreset("COMPLETED")}>
+            최근 완료
+          </button>
+          <button type="button" className="filter-chip" onClick={() => applyQuickPreset("ALL")}>
+            전체 보기
+          </button>
         </div>
         <div className="report-filters">
           <label>

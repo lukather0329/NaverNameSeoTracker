@@ -921,6 +921,8 @@ function ReportsView({ snapshot }: { snapshot: AppSnapshot }) {
   const [judgementFilter, setJudgementFilter] = useState<string>("ALL");
   const [windowFilter, setWindowFilter] = useState<string>("ALL");
   const [sortKey, setSortKey] = useState<"LATEST_TRACKED" | "BEST_RANK" | "BEST_DELTA" | "BEST_UP_RATE" | "NAME">("LATEST_TRACKED");
+  const [startDateFilter, setStartDateFilter] = useState("");
+  const [endDateFilter, setEndDateFilter] = useState("");
   const [copyFeedback, setCopyFeedback] = useState<"IDLE" | "SUCCESS" | "ERROR">("IDLE");
 
   const filteredRows = experimentRows.filter((row) => {
@@ -932,13 +934,15 @@ function ReportsView({ snapshot }: { snapshot: AppSnapshot }) {
     const statusMatch = statusFilter === "ALL" || row.status === statusFilter;
     const judgementMatch = judgementFilter === "ALL" || row.judgement === judgementFilter;
     const windowMatch = matchesTrackedWindow(row.trackedAtValue, windowFilter);
-    return searchMatch && statusMatch && judgementMatch && windowMatch;
+    const dateRangeMatch = matchesTrackedDateRange(row.trackedAtValue, startDateFilter, endDateFilter);
+    return searchMatch && statusMatch && judgementMatch && windowMatch && dateRangeMatch;
   });
   const sortedRows = sortExperimentReportRows(filteredRows, sortKey);
   const filteredExperimentIds = new Set(sortedRows.map((row) => row.id));
   const filteredResults = snapshot.results.filter((row) => filteredExperimentIds.has(row.experimentId));
   const summaryCards = buildReportSummary(snapshot, filteredRows, filteredResults);
-  const managementSummary = buildReportManagementSummary(sortedRows, filteredResults, windowFilter);
+  const filterScopeLabel = buildTrackedScopeLabel(windowFilter, startDateFilter, endDateFilter);
+  const managementSummary = buildReportManagementSummary(sortedRows, filteredResults, filterScopeLabel);
 
   const reportSortSummaryLabel =
     sortKey === "LATEST_TRACKED"
@@ -957,12 +961,16 @@ function ReportsView({ snapshot }: { snapshot: AppSnapshot }) {
     setJudgementFilter("ALL");
     setWindowFilter("ALL");
     setSortKey("LATEST_TRACKED");
+    setStartDateFilter("");
+    setEndDateFilter("");
     setCopyFeedback("IDLE");
   }
 
   function applyQuickPreset(preset: "EFFECTIVE" | "RISK" | "COMPLETED" | "ALL") {
     setSearchQuery("");
     setCopyFeedback("IDLE");
+    setStartDateFilter("");
+    setEndDateFilter("");
 
     if (preset === "EFFECTIVE") {
       setStatusFilter("RUNNING");
@@ -1033,7 +1041,7 @@ function ReportsView({ snapshot }: { snapshot: AppSnapshot }) {
           <div>
             <p className="eyebrow">리포트 필터</p>
             <h3>리포트 행 필터</h3>
-            <p className="helper-copy">현재 정렬: {reportSortSummaryLabel}</p>
+            <p className="helper-copy">현재 정렬: {reportSortSummaryLabel} · 범위: {filterScopeLabel}</p>
           </div>
           <div className="inline-actions">
             <span className="filter-summary">실험 {sortedRows.length}개</span>
@@ -1094,6 +1102,14 @@ function ReportsView({ snapshot }: { snapshot: AppSnapshot }) {
               <option value="30D">최근 30일</option>
               <option value="90D">최근 90일</option>
             </select>
+          </label>
+          <label>
+            <span>시작일</span>
+            <input type="date" value={startDateFilter} onChange={(event) => setStartDateFilter(event.target.value)} />
+          </label>
+          <label>
+            <span>종료일</span>
+            <input type="date" value={endDateFilter} onChange={(event) => setEndDateFilter(event.target.value)} />
           </label>
           <label>
             <span>정렬</span>
@@ -1263,7 +1279,7 @@ function buildReportSummary(snapshot: AppSnapshot, experimentRows: ExperimentRep
 function buildReportManagementSummary(
   experimentRows: ExperimentReportRow[],
   filteredResults: RankTrackingResult[],
-  windowFilter: string
+  scopeLabel: string
 ): ReportManagementSummary {
   if (experimentRows.length === 0) {
     return {
@@ -1297,8 +1313,6 @@ function buildReportManagementSummary(
     .map((row) => parseTrackedAt(row.trackedAt))
     .filter((value): value is number => value !== null)
     .sort((left, right) => right - left)[0];
-  const scopeLabel =
-    windowFilter === "7D" ? "최근 7일" : windowFilter === "30D" ? "최근 30일" : windowFilter === "90D" ? "최근 90일" : "전체 기간";
 
   return {
     headline: `${scopeLabel} 기준 ${experimentRows.length}개 실험 중 효과 있음 ${effectiveCount}개, 악화 ${worseCount}개, 완료 ${completedCount}개입니다.`,
@@ -1351,14 +1365,72 @@ async function copyTextToClipboard(text: string) {
     throw new Error("copy failed");
   }
 }
-function matchesTrackedWindow(trackedAtValue: string | undefined, windowFilter: string) {
-  if (windowFilter === "ALL" || !trackedAtValue) {
+
+function buildTrackedScopeLabel(windowFilter: string, startDateFilter: string, endDateFilter: string) {
+  if (startDateFilter && endDateFilter) {
+    return `${startDateFilter} ~ ${endDateFilter}`;
+  }
+
+  if (startDateFilter) {
+    return `${startDateFilter} 이후`;
+  }
+
+  if (endDateFilter) {
+    return `${endDateFilter} 이전`;
+  }
+
+  if (windowFilter === "7D") {
+    return "최근 7일";
+  }
+
+  if (windowFilter === "30D") {
+    return "최근 30일";
+  }
+
+  if (windowFilter === "90D") {
+    return "최근 90일";
+  }
+
+  return "전체 기간";
+}
+
+function matchesTrackedDateRange(trackedAtValue: string | undefined, startDateFilter: string, endDateFilter: string) {
+  if ((!startDateFilter && !endDateFilter) || !trackedAtValue) {
     return true;
   }
+
   const trackedAt = new Date(trackedAtValue).getTime();
   if (Number.isNaN(trackedAt)) {
     return false;
   }
+
+  if (startDateFilter) {
+    const start = new Date(`${startDateFilter}T00:00:00`).getTime();
+    if (!Number.isNaN(start) && trackedAt < start) {
+      return false;
+    }
+  }
+
+  if (endDateFilter) {
+    const end = new Date(`${endDateFilter}T23:59:59`).getTime();
+    if (!Number.isNaN(end) && trackedAt > end) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function matchesTrackedWindow(trackedAtValue: string | undefined, windowFilter: string) {
+  if (windowFilter === "ALL" || !trackedAtValue) {
+    return true;
+  }
+
+  const trackedAt = new Date(trackedAtValue).getTime();
+  if (Number.isNaN(trackedAt)) {
+    return false;
+  }
+
   const now = Date.now();
   const thresholds: Record<string, number> = {
     "7D": 7,
@@ -1369,8 +1441,10 @@ function matchesTrackedWindow(trackedAtValue: string | undefined, windowFilter: 
   if (!days) {
     return true;
   }
+
   return now - trackedAt <= days * 24 * 60 * 60 * 1000;
 }
+
 
 function sortExperimentReportRows(
   rows: ExperimentReportRow[],

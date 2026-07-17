@@ -1181,6 +1181,7 @@ function ReportsView({ snapshot }: { snapshot: AppSnapshot }) {
           </div>
           <div className="inline-actions">
             <span className="filter-summary">실험 {sortedRows.length}개</span>
+            <span className="filter-summary">추적 결과 {filteredResults.length}건</span>
             <button type="button" className="action-button secondary" onClick={resetFilters}>
               필터 초기화
             </button>

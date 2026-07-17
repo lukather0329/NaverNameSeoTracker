@@ -1060,6 +1060,13 @@ select {
   font-weight: 800;
 }
 
+.report-summary-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
 .empty-state-card {
   display: grid;
   gap: 8px;

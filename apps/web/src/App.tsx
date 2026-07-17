@@ -1184,12 +1184,14 @@ function ReportsView({ snapshot }: { snapshot: AppSnapshot }) {
             <p className="helper-copy">현재 정렬: {reportSortSummaryLabel} · 범위: {filterScopeLabel}</p>
           </div>
           <div className="inline-actions">
+            <div className="report-summary-chips">
             <span className="filter-summary">실험 {sortedRows.length}개</span>
             <span className="filter-summary">추적 결과 {filteredResults.length}건</span>
             <span className="filter-summary">효과 있음 {effectiveReportCount}개</span>
             <span className="filter-summary">악화 {worseReportCount}개</span>
             <span className="filter-summary">완료 {completedReportCount}개</span>
             <span className="filter-summary">진행 중 {runningReportCount}개</span>
+            </div>
             <button type="button" className="action-button secondary" onClick={resetFilters}>
               필터 초기화
             </button>

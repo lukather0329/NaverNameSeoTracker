@@ -929,6 +929,7 @@ function ReportsView({ snapshot }: { snapshot: AppSnapshot }) {
   const filteredExperimentIds = new Set(sortedRows.map((row) => row.id));
   const filteredResults = snapshot.results.filter((row) => filteredExperimentIds.has(row.experimentId));
   const summaryCards = buildReportSummary(snapshot, filteredRows, filteredResults);
+  const managementSummary = buildReportManagementSummary(sortedRows, filteredResults, windowFilter);
 
   const reportSortSummaryLabel =
     sortKey === "LATEST_TRACKED"
@@ -1095,6 +1096,27 @@ function ReportsView({ snapshot }: { snapshot: AppSnapshot }) {
           </article>
         ))}
       </div>
+      <section className="panel report-briefing-panel">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">관리 요약</p>
+            <h3>회의 공유용 핵심 요약</h3>
+            <p className="helper-copy">필터 결과를 기준으로 바로 전달할 수 있는 문장입니다.</p>
+          </div>
+        </div>
+        <div className="report-briefing-card">
+          <strong>{managementSummary.headline}</strong>
+          <div className="report-briefing-grid">
+            {managementSummary.points.map((point) => (
+              <article key={point.label} className="report-briefing-item">
+                <span>{point.label}</span>
+                <p>{point.text}</p>
+              </article>
+            ))}
+          </div>
+          <small>{managementSummary.footer}</small>
+        </div>
+      </section>
       <section className="panel">
         <div className="section-heading">
           <div>
@@ -1211,6 +1233,72 @@ function buildReportSummary(snapshot: AppSnapshot, experimentRows: ExperimentRep
       caption: `${experimentRows.filter((row) => row.avgDelta !== "-").length}개 실험 반영`
     }
   ];
+}
+
+function buildReportManagementSummary(
+  experimentRows: ExperimentReportRow[],
+  filteredResults: RankTrackingResult[],
+  windowFilter: string
+) {
+  if (experimentRows.length === 0) {
+    return {
+      headline: "현재 필터 조건과 일치하는 실험이 없어 관리 요약을 생성할 수 없습니다.",
+      points: [
+        { label: "권장 조치", text: "필터를 초기화하거나 추적 기간을 넓혀 다시 확인해보세요." },
+        { label: "데이터 범위", text: "실험명 검색어와 상태, 판단, 기간 조건이 모두 함께 적용됩니다." },
+        { label: "다음 확인", text: "필터가 넓어진 뒤 CSV를 내려받아 주간 보고용으로 재사용할 수 있습니다." }
+      ],
+      footer: "필터 결과가 비어 있으므로 최신 추적 시각을 계산하지 않았습니다."
+    };
+  }
+
+  const effectiveCount = experimentRows.filter((row) => row.judgement === "EFFECTIVE").length;
+  const worseCount = experimentRows.filter((row) => row.judgement === "WORSE").length;
+  const pendingCount = experimentRows.filter((row) => row.judgement === "PENDING").length;
+  const completedCount = experimentRows.filter((row) => row.status === "COMPLETED").length;
+  const runningCount = experimentRows.filter((row) => row.status === "RUNNING").length;
+  const avgDeltaValues = experimentRows
+    .map((row) => parseReportNumber(row.avgDelta))
+    .filter((value): value is number => value !== null);
+  const avgDelta =
+    avgDeltaValues.length > 0 ? (avgDeltaValues.reduce((sum, value) => sum + value, 0) / avgDeltaValues.length).toFixed(1) : null;
+  const bestExperiment = experimentRows
+    .filter((row) => parseReportNumber(row.avgDelta) !== null)
+    .sort((left, right) => compareNullableNumbers(parseReportNumber(left.avgDelta), parseReportNumber(right.avgDelta), false))[0];
+  const riskExperiment = experimentRows
+    .filter((row) => row.judgement === "WORSE")
+    .sort((left, right) => compareNullableNumbers(parseReportNumber(left.latestRank), parseReportNumber(right.latestRank), true))[0];
+  const latestTrackedAt = filteredResults
+    .map((row) => parseTrackedAt(row.trackedAt))
+    .filter((value): value is number => value !== null)
+    .sort((left, right) => right - left)[0];
+  const scopeLabel =
+    windowFilter === "7D" ? "최근 7일" : windowFilter === "30D" ? "최근 30일" : windowFilter === "90D" ? "최근 90일" : "전체 기간";
+
+  return {
+    headline: `${scopeLabel} 기준 ${experimentRows.length}개 실험 중 효과 있음 ${effectiveCount}개, 악화 ${worseCount}개, 완료 ${completedCount}개입니다.`,
+    points: [
+      {
+        label: "운영 현황",
+        text: `현재 진행 중 ${runningCount}개, 판단 대기 ${pendingCount}개이며 평균 변화량은 ${avgDelta ?? "집계 불가"}입니다.`
+      },
+      {
+        label: "성과 포인트",
+        text: bestExperiment
+          ? `${bestExperiment.name} 실험이 평균 변화량 ${bestExperiment.avgDelta}로 가장 좋습니다.`
+          : "아직 평균 변화량을 계산할 수 있는 실험 데이터가 충분하지 않습니다."
+      },
+      {
+        label: "주의 포인트",
+        text: riskExperiment
+          ? `${riskExperiment.name} 실험은 최신 순위 ${riskExperiment.latestRank}위로 악화 판단이므로 우선 점검이 필요합니다.`
+          : "현재 필터 범위에서는 악화 판단 실험이 없습니다."
+      }
+    ],
+    footer: latestTrackedAt
+      ? `최신 추적 반영 시각: ${formatDateTime(new Date(latestTrackedAt).toISOString())}`
+      : "최신 추적 반영 시각을 확인할 데이터가 없습니다."
+  };
 }
 
 function matchesTrackedWindow(trackedAtValue: string | undefined, windowFilter: string) {

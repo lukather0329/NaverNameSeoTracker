@@ -942,6 +942,10 @@ function ReportsView({ snapshot }: { snapshot: AppSnapshot }) {
   const [savedPresets, setSavedPresets] = useState<ReportFilterPreset[]>([]);
   const hasInvalidDateRange = Boolean(startDateFilter && endDateFilter && startDateFilter > endDateFilter);
 
+  useEffect(() => {
+    setSavedPresets(loadStoredReportPresets());
+  }, []);
+
   const filteredRows = experimentRows.filter((row) => {
     const normalizedQuery = searchQuery.trim().toLowerCase();
     const searchMatch =
@@ -989,6 +993,7 @@ function ReportsView({ snapshot }: { snapshot: AppSnapshot }) {
     setCopyFeedback("IDLE");
     setStartDateFilter("");
     setEndDateFilter("");
+    setSelectedPresetName("");
 
     if (preset === "EFFECTIVE") {
       setStatusFilter("RUNNING");
@@ -1031,6 +1036,7 @@ function ReportsView({ snapshot }: { snapshot: AppSnapshot }) {
   }
 
   function applySavedPreset(preset: ReportFilterPreset) {
+    const nextPresets = [preset, ...savedPresets.filter((item) => item.name !== preset.name)].slice(0, 12);
     setSearchQuery(preset.searchQuery);
     setStatusFilter(preset.statusFilter);
     setJudgementFilter(preset.judgementFilter);
@@ -1039,7 +1045,9 @@ function ReportsView({ snapshot }: { snapshot: AppSnapshot }) {
     setEndDateFilter(preset.endDateFilter);
     setSortKey(preset.sortKey);
     setSelectedPresetName(preset.name);
+    setSavedPresets(nextPresets);
     setCopyFeedback("IDLE");
+    persistStoredReportPresets(nextPresets);
   }
 
   function handleSaveCurrentPreset() {
@@ -1074,7 +1082,6 @@ function ReportsView({ snapshot }: { snapshot: AppSnapshot }) {
     setSelectedPresetName("");
     persistStoredReportPresets(nextPresets);
   }
-
 
   async function handleCopyManagementSummary() {
     if (hasInvalidDateRange) {
@@ -1180,6 +1187,10 @@ function ReportsView({ snapshot }: { snapshot: AppSnapshot }) {
           <button type="button" className="action-button secondary" onClick={handleDeleteSelectedPreset} disabled={!selectedPresetName}>
             삭제
           </button>
+        </div>
+        <div className="report-active-preset-row">
+          <span className="filter-summary">활성 프리셋 {selectedPresetName || "없음"}</span>
+          <small>{selectedPresetName ? "불러온 프리셋이 가장 위로 이동합니다." : "현재 필터를 저장하면 반복 리포트 작업이 빨라집니다."}</small>
         </div>
         <div className="report-filters">
           <label>

@@ -966,6 +966,17 @@ select {
   background: rgba(255, 255, 255, 0.98);
 }
 
+.report-active-preset-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.report-active-preset-row small {
+  color: var(--text-soft);
+}
+
 .report-filters {
   display: grid;
   gap: 14px;

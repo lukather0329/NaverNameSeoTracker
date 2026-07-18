@@ -1,6 +1,6 @@
 # Report Branch Merge Checklist
 
-Last updated: 2026-07-17
+Last updated: 2026-07-18
 Target branch: `feature/reports`
 Merge target: `dev`
 
@@ -47,7 +47,7 @@ npm run dev
 
 ## 4. Filter Checks
 
-- Change `검색`, `상품`, `실험`, `상태`, `판단`, `기간`, and `정렬`.
+- Change `검색어`, `상품`, `실험`, `상태`, `판단`, `기간`, and `정렬`.
 - Confirm the table updates immediately.
 - Confirm `적용 중인 필터` updates immediately.
 - Confirm non-default sort appears in `적용 중인 필터`.
@@ -75,7 +75,7 @@ npm run dev
 ## 7. Export Checks
 
 - Download `실험 리포트 CSV`.
-- Download `랭킹 결과 CSV`.
+- Download `집계 결과 CSV`.
 - Confirm each file opens correctly in Excel.
 - Confirm each file includes filter summary rows at the top.
 - Confirm the filter summary rows match the visible filters on screen.

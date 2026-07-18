@@ -3,16 +3,21 @@
 Validation date: 2026-07-18
 Branch: `feature/reports`
 Validator: `TBD`
-Status: `not started`
+Status: `manual checks pending`
 
 ## 1. Environment
 
-- [ ] `git checkout feature/reports`
-- [ ] `git pull origin feature/reports`
-- [ ] `npm.cmd run prisma:generate`
-- [ ] `npm.cmd run prisma:seed`
-- [ ] `npm.cmd run build`
+- [x] `git checkout feature/reports`
+- [x] `git pull origin feature/reports`
+- [x] `npm.cmd run prisma:generate`
+- [x] `npm.cmd run prisma:seed`
+- [x] `npm.cmd run build`
 - [ ] `npm run dev`
+
+Notes:
+- Automated validation was completed on Saturday, July 18, 2026.
+- `npm.cmd run prisma:generate` passed after stopping local project dev processes.
+- Browser-based checks below are still pending.
 
 ## 2. Report UI Checks
 

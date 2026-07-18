@@ -81,3 +81,19 @@ Stopping those processes allowed `npm.cmd run prisma:generate` to succeed on the
 - http://localhost:5173 responded with HTTP 200 on Saturday, July 18, 2026.
 - http://localhost:4300/api/snapshot responded with HTTP 200 on Saturday, July 18, 2026.
 - This confirms the local web shell and main API snapshot endpoint were both reachable before manual browser validation.
+
+## 9. Snapshot data sanity before manual validation
+
+- http://localhost:4300/api/snapshot returned structured data with the following counts on Saturday, July 18, 2026:
+  - products: 1
+  - experiments: 1
+  - results: 2
+  - jobs: 1
+  - api accounts: 2
+  - logs: 1
+- Dashboard sample values at that moment:
+  - running experiments: 1
+  - up count: 1
+  - down count: 1
+  - average rank delta: -3.5
+- This confirms the manual report UI checks will not be starting from an empty dataset.

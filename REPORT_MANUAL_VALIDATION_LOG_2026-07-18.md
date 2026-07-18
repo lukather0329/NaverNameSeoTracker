@@ -12,12 +12,13 @@ Status: `manual checks pending`
 - [x] `npm.cmd run prisma:generate`
 - [x] `npm.cmd run prisma:seed`
 - [x] `npm.cmd run build`
-- [ ] `npm run dev`
+- [x] `npm run dev`
 
 Notes:
 - Automated validation was completed on Saturday, July 18, 2026.
 - `npm.cmd run prisma:generate` passed after stopping local project dev processes.
 - Browser-based checks below are still pending.
+- Local dev servers were confirmed reachable on Saturday, July 18, 2026: `http://localhost:5173` and `http://localhost:4300/api/snapshot` both responded with HTTP 200.
 
 ## 2. Report UI Checks
 

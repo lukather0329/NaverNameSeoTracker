@@ -69,3 +69,22 @@ Why:
 Use [REPORT_MERGE_CHECKLIST.md](D:\Codex\NaverNameSeoTracker\REPORT_MERGE_CHECKLIST.md) as the step-by-step pass/fail checklist.
 
 After the blocked Prisma step is cleared and the manual checklist passes, `feature/reports` can be reviewed for merge into `dev`.
+
+## 7. Observed process state during validation
+
+The following project-local dev processes were still running while validation was attempted on Saturday, July 18, 2026:
+
+- workspace `npm run dev`
+- server `tsx watch src/server.ts`
+- web `vite`
+
+This makes it highly likely that the Prisma engine binary in `node_modules\.prisma\client` was still in use during `npm.cmd run prisma:generate`.
+
+## 8. Practical next attempt
+
+Before retrying Prisma generate on this machine:
+
+1. Stop the local `NaverNameSeoTracker` dev server processes.
+2. Retry `npm.cmd run prisma:generate`.
+3. If it passes, update this validation file from `partially verified` to `automated checks passed`.
+4. Then continue the remaining manual browser checks from `REPORT_MERGE_CHECKLIST.md`.

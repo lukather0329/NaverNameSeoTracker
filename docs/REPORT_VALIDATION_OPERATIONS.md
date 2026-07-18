@@ -1,4 +1,4 @@
-﻿# 리포트 검증 운영 가이드
+# 리포트 검증 운영 가이드
 
 기준일: 2026-07-18  
 대상 브랜치: `feature/reports`
@@ -10,19 +10,21 @@
 ## 1.5. 빠른 진입
 
 - 통합 실행 메뉴: [리포트_검증_도구모음.bat](/D:/Codex/NaverNameSeoTracker/리포트_검증_도구모음.bat)
-- 위 배치에서 시작, 스모크체크, 로그 열기, 정리를 한 화면에서 선택할 수 있습니다.
+- 위 배치에서 시작, 스모크체크, 상태 캡처, 상태 비교, 로그 열기, 정리를 한 화면에서 선택할 수 있습니다.
 
 ## 2. 추천 순서
 
 1. [리포트_수동검증_시작.bat](/D:/Codex/NaverNameSeoTracker/리포트_수동검증_시작.bat) 실행
 2. 브라우저와 문서가 열리면 [리포트_스모크체크.bat](/D:/Codex/NaverNameSeoTracker/리포트_스모크체크.bat) 실행
-3. `리포트` 화면과 `API 계정` 화면을 실제로 눌러보며 [REPORT_MANUAL_VALIDATION_LOG_2026-07-18.md](/D:/Codex/NaverNameSeoTracker/REPORT_MANUAL_VALIDATION_LOG_2026-07-18.md) 체크
-4. 검증이 끝나면 [리포트_수동검증_정리.bat](/D:/Codex/NaverNameSeoTracker/리포트_수동검증_정리.bat) 실행
+3. 필요하면 [리포트_상태캡처.bat](/D:/Codex/NaverNameSeoTracker/리포트_상태캡처.bat)로 현재 상태를 저장
+4. 필요하면 [리포트_상태비교.bat](/D:/Codex/NaverNameSeoTracker/리포트_상태비교.bat)로 기준값과 차이를 확인
+5. `리포트` 화면과 `API 계정` 화면을 실제로 눌러보며 [REPORT_MANUAL_VALIDATION_LOG_2026-07-18.md](/D:/Codex/NaverNameSeoTracker/REPORT_MANUAL_VALIDATION_LOG_2026-07-18.md) 체크
+6. 검증이 끝나면 [리포트_수동검증_정리.bat](/D:/Codex/NaverNameSeoTracker/리포트_수동검증_정리.bat) 실행
 
 ## 3. 배치파일 역할
 
 - `리포트_검증_도구모음.bat`
-  - 시작, 스모크체크, 운영 문서 열기, 로그 열기, 정리를 메뉴에서 선택 실행
+  - 시작, 스모크체크, 상태 캡처, 상태 비교, 운영 문서 열기, 로그 열기, 정리를 메뉴에서 선택 실행
 - `리포트_수동검증_시작.bat`
   - `feature/reports` 체크아웃
   - `git pull origin feature/reports`
@@ -32,6 +34,10 @@
   - `npm run build`
   - `npm run dev` 실행
   - 브라우저와 검증 문서 자동 열기
+- `리포트_상태캡처.bat`
+  - `.tmp\report-validation-status-latest.txt`와 시각별 스냅샷 파일 저장
+- `리포트_상태비교.bat`
+  - 최신 상태 캡처 파일과 기준값 차이 비교
 - `리포트_스모크체크.bat`
   - `http://localhost:5173` 응답 확인
   - `http://localhost:4300/api/snapshot` 응답 확인

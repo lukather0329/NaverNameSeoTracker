@@ -15,10 +15,11 @@ echo.
 echo 1. Start validation workspace
 echo 2. Run smoke check
 echo 3. Capture current status
-echo 4. Open operations guide
-echo 5. Open manual validation log
-echo 6. Cleanup validation processes
-echo 7. Open local web app
+echo 4. Compare latest status
+echo 5. Open operations guide
+echo 6. Open manual validation log
+echo 7. Cleanup validation processes
+echo 8. Open local web app
 echo 0. Exit
 echo.
 set /p choice=Select menu: 
@@ -26,10 +27,11 @@ set /p choice=Select menu:
 if "%choice%"=="1" call "%~dp0리포트_수동검증_시작.bat"
 if "%choice%"=="2" call "%~dp0리포트_스모크체크.bat"
 if "%choice%"=="3" call "%~dp0리포트_상태캡처.bat"
-if "%choice%"=="4" start "" "%~dp0docs\REPORT_VALIDATION_OPERATIONS.md"
-if "%choice%"=="5" start "" "%~dp0REPORT_MANUAL_VALIDATION_LOG_2026-07-18.md"
-if "%choice%"=="6" call "%~dp0리포트_수동검증_정리.bat"
-if "%choice%"=="7" start "" "http://localhost:5173"
+if "%choice%"=="4" call "%~dp0리포트_상태비교.bat"
+if "%choice%"=="5" start "" "%~dp0docs\REPORT_VALIDATION_OPERATIONS.md"
+if "%choice%"=="6" start "" "%~dp0REPORT_MANUAL_VALIDATION_LOG_2026-07-18.md"
+if "%choice%"=="7" call "%~dp0리포트_수동검증_정리.bat"
+if "%choice%"=="8" start "" "http://localhost:5173"
 if "%choice%"=="0" exit /b 0
 
 echo.

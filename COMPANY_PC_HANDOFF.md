@@ -21,7 +21,7 @@ Current focus branch: `feature/reports`
   - latest previously noted commit: `1c0b5a1 docs: refresh company handoff status`
 - `feature/reports`
   - current working branch
-  - latest pushed commit on Saturday, July 18, 2026: `42ef506 docs: note report manual validation readiness`
+  - latest pushed report documentation updates were synced on Saturday, July 18, 2026
   - report screen, filters, summary cards, experiment report table, and CSV export flow are implemented
   - saved report filter presets are implemented with local persistence, active preset display, and recent-use reorder
   - report CSV exports include active filter summary rows
@@ -128,3 +128,4 @@ npm run dev
 - Use [REPORT_MANUAL_VALIDATION_LOG_2026-07-18.md](D:\Codex\NaverNameSeoTracker\REPORT_MANUAL_VALIDATION_LOG_2026-07-18.md) to record the actual browser test results.
 - Latest automated validation snapshot: [REPORT_MERGE_VALIDATION_2026-07-18.md](D:\Codex\NaverNameSeoTracker\REPORT_MERGE_VALIDATION_2026-07-18.md)
 - Quick browser test entry point: [docs/REPORT_MANUAL_VALIDATION_QUICKSTART.md](D:\Codex\NaverNameSeoTracker\docs\REPORT_MANUAL_VALIDATION_QUICKSTART.md)
+- One-click validation starter: [리포트_수동검증_시작.bat](D:\Codex\NaverNameSeoTracker\리포트_수동검증_시작.bat)

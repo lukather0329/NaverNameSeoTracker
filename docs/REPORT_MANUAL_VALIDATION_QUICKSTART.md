@@ -36,6 +36,11 @@
 - 하락 수: `1`
 - 평균 순위 변화: `-3.5`
 
+## 2.5. 원클릭 시작
+
+- 배치 실행: [리포트_수동검증_시작.bat](/D:/Codex/NaverNameSeoTracker/리포트_수동검증_시작.bat)
+- 위 배치파일은 `feature/reports` 브랜치 전환, pull, `npm install`, `prisma:generate`, `prisma:seed`, `build`, `npm run dev` 시작까지 한 번에 수행합니다.
+
 ## 3. 실행 순서
 
 ```bash

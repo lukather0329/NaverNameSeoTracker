@@ -1,36 +1,35 @@
 # Company PC Handoff
 
-Last updated: 2026-07-17
+Last updated: 2026-07-18
 Current repo: `D:\Codex\NaverNameSeoTracker`
 Primary remote: `https://github.com/lukather0329/NaverNameSeoTracker.git`
 Current focus branch: `feature/reports`
 
-## 1. Sync status as of 2026-07-17
+## 1. Sync status as of 2026-07-18
 
 - `main`
   - synced with `origin/main`
 - `dev`
   - synced with `origin/dev`
 - `feature/api-accounts`
-  - latest pushed commit: `af888e7 docs: add company handoff checklist`
+  - latest previously noted commit: `af888e7 docs: add company handoff checklist`
 - `feature/products`
-  - latest pushed commit: `85075ee feat: add product management workflow`
+  - latest previously noted commit: `85075ee feat: add product management workflow`
 - `feature/seo-title-apply`
-  - latest pushed commit: `24bb8fc feat: add SEO title apply workflow`
+  - latest previously noted commit: `24bb8fc feat: add SEO title apply workflow`
 - `feature/rank-tracking`
-  - latest pushed commit: `1c0b5a1 docs: refresh company PC handoff status`
+  - latest previously noted commit: `1c0b5a1 docs: refresh company handoff status`
 - `feature/reports`
   - current working branch
-  - latest pushed commit: `f2d9f99 feat: track active report sort state`
+  - latest pushed commit on Saturday, July 18, 2026: `42ef506 docs: note report manual validation readiness`
   - report screen, filters, summary cards, experiment report table, and CSV export flow are implemented
   - saved report filter presets are implemented with local persistence, active preset display, and recent-use reorder
   - report CSV exports include active filter summary rows
   - report table shows applied filters and empty-state recovery actions
   - report top summary chips show experiment count, result count, effective count, worse count, completed count, and running count
-  - workspace build re-verified on 2026-07-17 with `npm run build`
-  - local API health and snapshot verified after dotenv/prisma bootstrap fix on 2026-07-16
-  - sample seed data restored and snapshot data verified on 2026-07-16
-  - API account save flow verified on 2026-07-16
+  - workspace build re-verified on Saturday, July 18, 2026 with `npm.cmd run build`
+  - local web and API smoke checks re-verified on Saturday, July 18, 2026
+  - manual browser validation is the main remaining gate before merge into `dev`
 - SEARCH_AD live connection test added on 2026-07-16 (COMMERCE/CUSTOM remain validation-only)
 
 ## 2. First steps on company PC
@@ -84,7 +83,7 @@ git pull origin feature/reports
 - run `npm run prisma:generate`
 - run `npm run prisma:seed`
 - open the app and click `API 계정`
-- save one API account and run `연결 테스트`
+- save one API account and run `검증 테스트`
 - confirm validation message appears
 - open the app and click `리포트`
 - confirm summary cards render with seeded values
@@ -94,7 +93,7 @@ git pull origin feature/reports
 - save one report preset, reload it, and confirm it moves to the top after use
 - trigger a no-result state and confirm recovery actions are visible
 - click `실험 리포트 CSV`
-- click `랭킹 결과 CSV`
+- click `집계 결과 CSV`
 - confirm the exported CSV includes filter summary rows at the top
 - confirm downloaded file opens correctly in Excel
 
@@ -125,5 +124,7 @@ npm run dev
 - `feature/reports` is in late-stage polish, not open-ended exploration.
 - The branch already covers the expected report UX surface for MVP verification.
 - The next meaningful milestone is branch validation and merge readiness, not more endless UI churn.
-- Use [REPORT_MERGE_CHECKLIST.md](D:\Codex\NaverNameSeoTracker\REPORT_MERGE_CHECKLIST.md) as the pass/fail checklist before merging into dev.
+- Use [REPORT_MERGE_CHECKLIST.md](D:\Codex\NaverNameSeoTracker\REPORT_MERGE_CHECKLIST.md) as the pass/fail checklist before merging into `dev`.
+- Use [REPORT_MANUAL_VALIDATION_LOG_2026-07-18.md](D:\Codex\NaverNameSeoTracker\REPORT_MANUAL_VALIDATION_LOG_2026-07-18.md) to record the actual browser test results.
 - Latest automated validation snapshot: [REPORT_MERGE_VALIDATION_2026-07-18.md](D:\Codex\NaverNameSeoTracker\REPORT_MERGE_VALIDATION_2026-07-18.md)
+- Quick browser test entry point: [docs/REPORT_MANUAL_VALIDATION_QUICKSTART.md](D:\Codex\NaverNameSeoTracker\docs\REPORT_MANUAL_VALIDATION_QUICKSTART.md)

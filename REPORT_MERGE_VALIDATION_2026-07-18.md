@@ -1,4 +1,4 @@
-﻿# Report Merge Validation Status
+# Report Merge Validation Status
 
 Validation date: 2026-07-18
 Branch: `feature/reports`
@@ -75,3 +75,9 @@ The following project-local dev processes were running when Prisma generate prev
 - web `vite`
 
 Stopping those processes allowed `npm.cmd run prisma:generate` to succeed on the retry.
+
+## 8. Local smoke checks before manual browser validation
+
+- http://localhost:5173 responded with HTTP 200 on Saturday, July 18, 2026.
+- http://localhost:4300/api/snapshot responded with HTTP 200 on Saturday, July 18, 2026.
+- This confirms the local web shell and main API snapshot endpoint were both reachable before manual browser validation.

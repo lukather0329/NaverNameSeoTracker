@@ -126,3 +126,4 @@ npm run dev
 - The branch already covers the expected report UX surface for MVP verification.
 - The next meaningful milestone is branch validation and merge readiness, not more endless UI churn.
 - Use [REPORT_MERGE_CHECKLIST.md](D:\Codex\NaverNameSeoTracker\REPORT_MERGE_CHECKLIST.md) as the pass/fail checklist before merging into dev.
+- Latest automated validation snapshot: [REPORT_MERGE_VALIDATION_2026-07-18.md](D:\Codex\NaverNameSeoTracker\REPORT_MERGE_VALIDATION_2026-07-18.md)

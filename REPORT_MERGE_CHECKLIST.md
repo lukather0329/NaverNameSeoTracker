@@ -108,3 +108,8 @@ If this checklist passes:
    - COMMERCE real adapter
    - MVP/OMS integration planning
    - shared reporting/export backend improvements
+
+## 11. Latest Automated Validation
+
+- Latest automated validation snapshot: [REPORT_MERGE_VALIDATION_2026-07-18.md](D:\Codex\NaverNameSeoTracker\REPORT_MERGE_VALIDATION_2026-07-18.md)
+- Current known blocker from that run: `npm.cmd run prisma:generate` failed with a Windows `EPERM rename` file-lock issue.

@@ -21,7 +21,7 @@ Current focus branch: `feature/reports`
   - latest previously noted commit: `1c0b5a1 docs: refresh company handoff status`
 - `feature/reports`
   - current working branch
-  - latest pushed report documentation updates were synced on Saturday, July 18, 2026
+  - latest pushed report documentation and validation helper updates were synced on Saturday, July 18, 2026
   - report screen, filters, summary cards, experiment report table, and CSV export flow are implemented
   - saved report filter presets are implemented with local persistence, active preset display, and recent-use reorder
   - report CSV exports include active filter summary rows
@@ -66,15 +66,18 @@ git pull origin feature/reports
 - Vite env typing and workspace build scripts aligned
 - server dotenv load order fixed so Prisma reads `DATABASE_URL` during runtime
 - `prisma/seed.ts` repaired to provide stable sample report data
+- validation helper launchers added for start, smoke check, and cleanup flows
 
 ## 4. Recommended next work order
 
-1. Verify `feature/reports` UI rendering in browser and do a final report-branch UX pass.
-2. Test saved report presets, filter reset behavior, and empty-state recovery actions.
-3. Test both CSV downloads and confirm the exported filter summary matches the visible filters.
-4. Run one SEARCH_AD live test and confirm a new log row appears in API account history.
-5. Decide whether `feature/reports` is ready to merge into `dev`.
-6. After report merge readiness is confirmed, move to COMMERCE real adapter work or MVP/OMS integration planning.
+1. Run `리포트_수동검증_시작.bat`.
+2. Run `리포트_스모크체크.bat` and confirm the expected counts appear.
+3. Verify `feature/reports` UI rendering in browser and do a final report-branch UX pass.
+4. Test saved report presets, filter reset behavior, and empty-state recovery actions.
+5. Test both CSV downloads and confirm the exported filter summary matches the visible filters.
+6. Run one SEARCH_AD live test and confirm a new log row appears in API account history.
+7. Decide whether `feature/reports` is ready to merge into `dev`.
+8. Run `리포트_수동검증_정리.bat` after the session.
 
 ## 5. Report branch verification checklist
 
@@ -128,4 +131,7 @@ npm run dev
 - Use [REPORT_MANUAL_VALIDATION_LOG_2026-07-18.md](D:\Codex\NaverNameSeoTracker\REPORT_MANUAL_VALIDATION_LOG_2026-07-18.md) to record the actual browser test results.
 - Latest automated validation snapshot: [REPORT_MERGE_VALIDATION_2026-07-18.md](D:\Codex\NaverNameSeoTracker\REPORT_MERGE_VALIDATION_2026-07-18.md)
 - Quick browser test entry point: [docs/REPORT_MANUAL_VALIDATION_QUICKSTART.md](D:\Codex\NaverNameSeoTracker\docs\REPORT_MANUAL_VALIDATION_QUICKSTART.md)
+- Validation operations guide: [docs/REPORT_VALIDATION_OPERATIONS.md](D:\Codex\NaverNameSeoTracker\docs\REPORT_VALIDATION_OPERATIONS.md)
 - One-click validation starter: [리포트_수동검증_시작.bat](D:\Codex\NaverNameSeoTracker\리포트_수동검증_시작.bat)
+- Smoke check launcher: [리포트_스모크체크.bat](D:\Codex\NaverNameSeoTracker\리포트_스모크체크.bat)
+- Validation cleanup launcher: [리포트_수동검증_정리.bat](D:\Codex\NaverNameSeoTracker\리포트_수동검증_정리.bat)

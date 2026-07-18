@@ -88,6 +88,13 @@ echo [5/5] dev 서버 시작
 start "NaverNameSeoTracker Dev" cmd /k "cd /d %~dp0 && npm run dev"
 
 echo.
+echo [추가] 브라우저와 검증 문서를 자동으로 엽니다...
+timeout /t 5 /nobreak >nul
+start "" "http://localhost:5173"
+start "" "%~dp0docs\REPORT_MANUAL_VALIDATION_QUICKSTART.md"
+start "" "%~dp0REPORT_MANUAL_VALIDATION_LOG_2026-07-18.md"
+
+echo.
 echo [완료] 수동 검증 준비가 끝났습니다.
 echo.
 echo 다음 순서로 확인하세요.

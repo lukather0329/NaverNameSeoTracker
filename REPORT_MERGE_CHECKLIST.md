@@ -112,4 +112,4 @@ If this checklist passes:
 ## 11. Latest Automated Validation
 
 - Latest automated validation snapshot: [REPORT_MERGE_VALIDATION_2026-07-18.md](D:\Codex\NaverNameSeoTracker\REPORT_MERGE_VALIDATION_2026-07-18.md)
-- Current known blocker from that run: `npm.cmd run prisma:generate` failed with a Windows `EPERM rename` file-lock issue.
+- Latest automated status: `npm.cmd run prisma:generate`, `npm.cmd run prisma:seed`, and `npm.cmd run build` all passed on Saturday, July 18, 2026. Manual browser validation is still pending.

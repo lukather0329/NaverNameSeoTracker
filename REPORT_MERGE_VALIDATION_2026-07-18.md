@@ -6,42 +6,38 @@ Target merge branch: `dev`
 
 ## 1. Summary
 
-Current result: `partially verified`
+Current result: `automated checks passed`
 
 Automated checks completed today:
 
+- `npm.cmd run prisma:generate` -> passed
 - `npm.cmd run prisma:seed` -> passed
 - `npm.cmd run build` -> passed
-- `npm.cmd run prisma:generate` -> blocked by Windows file-lock issue
 
-Branch is not fully merge-approved yet because manual report UI checks and API regression checks still need to be completed, and `prisma:generate` should be re-run once the local lock issue is cleared.
+Branch is not fully merge-approved yet because manual report UI checks and API regression checks still need to be completed.
 
 ## 2. Detailed results
 
 ### Passed
 
+- Prisma Client generate completed successfully after stopping local project dev processes
 - root workspace build completed successfully
 - server TypeScript build completed successfully
 - web TypeScript and Vite production build completed successfully
 - Prisma seed completed successfully with the current schema and seed script
 
-### Blocked
+### Notes
 
-- `npm.cmd run prisma:generate`
-- observed error:
-  - `EPERM: operation not permitted, rename ... node_modules\.prisma\client\query_engine-windows.dll.node.tmp... -> ... query_engine-windows.dll.node`
-- likely cause:
-  - local Windows file lock on Prisma engine binary
-  - usually caused by a running process, antivirus scan, or stale handle on `.prisma\client`
+- stale temporary Prisma engine files still exist under `node_modules\\.prisma\\client`, but they did not block the successful rerun once local dev processes were stopped
+- the earlier failure was consistent with a Windows file-lock issue while project-local dev servers were active
 
-## 3. Recommended fix for blocked item
+## 3. Practical rule for next runs
 
-Try these in order on the machine where validation is being run:
+Before retrying Prisma generate on this machine in the future:
 
-1. Stop any running dev server, Node process, or Prisma-related watcher.
-2. Re-run `npm.cmd run prisma:generate`.
-3. If it still fails, close terminals and retry once.
-4. If it still fails, inspect whether security software or another process is holding `node_modules\.prisma\client\query_engine-windows.dll.node`.
+1. Stop the local `NaverNameSeoTracker` dev server processes.
+2. Run `npm.cmd run prisma:generate`.
+3. Restart dev servers only after generate completes.
 
 ## 4. Manual checks still required
 
@@ -57,34 +53,25 @@ The following checklist items still need a person in the browser:
 
 ## 5. Merge decision status
 
-Current merge status: `not yet approved`
+Current merge status: `manual validation pending`
 
 Why:
 
+- automated validation now passes
 - manual branch verification is still pending
-- Prisma generate should be re-run successfully after lock issue is cleared
 
 ## 6. Next action
 
 Use [REPORT_MERGE_CHECKLIST.md](D:\Codex\NaverNameSeoTracker\REPORT_MERGE_CHECKLIST.md) as the step-by-step pass/fail checklist.
 
-After the blocked Prisma step is cleared and the manual checklist passes, `feature/reports` can be reviewed for merge into `dev`.
+After the manual checklist passes, `feature/reports` can be reviewed for merge into `dev`.
 
-## 7. Observed process state during validation
+## 7. Observed process state during the original failure
 
-The following project-local dev processes were still running while validation was attempted on Saturday, July 18, 2026:
+The following project-local dev processes were running when Prisma generate previously failed on Saturday, July 18, 2026:
 
 - workspace `npm run dev`
 - server `tsx watch src/server.ts`
 - web `vite`
 
-This makes it highly likely that the Prisma engine binary in `node_modules\.prisma\client` was still in use during `npm.cmd run prisma:generate`.
-
-## 8. Practical next attempt
-
-Before retrying Prisma generate on this machine:
-
-1. Stop the local `NaverNameSeoTracker` dev server processes.
-2. Retry `npm.cmd run prisma:generate`.
-3. If it passes, update this validation file from `partially verified` to `automated checks passed`.
-4. Then continue the remaining manual browser checks from `REPORT_MERGE_CHECKLIST.md`.
+Stopping those processes allowed `npm.cmd run prisma:generate` to succeed on the retry.

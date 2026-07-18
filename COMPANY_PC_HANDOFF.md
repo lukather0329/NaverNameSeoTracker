@@ -66,18 +66,20 @@ git pull origin feature/reports
 - Vite env typing and workspace build scripts aligned
 - server dotenv load order fixed so Prisma reads `DATABASE_URL` during runtime
 - `prisma/seed.ts` repaired to provide stable sample report data
-- validation helper launchers added for start, smoke check, and cleanup flows
+- validation helper launchers added for start, smoke check, status capture, status comparison, toolbox, and cleanup flows
 
 ## 4. Recommended next work order
 
-1. Run `리포트_수동검증_시작.bat`.
+1. Run `리포트_검증_도구모음.bat` or `리포트_수동검증_시작.bat`.
 2. Run `리포트_스모크체크.bat` and confirm the expected counts appear.
-3. Verify `feature/reports` UI rendering in browser and do a final report-branch UX pass.
-4. Test saved report presets, filter reset behavior, and empty-state recovery actions.
-5. Test both CSV downloads and confirm the exported filter summary matches the visible filters.
-6. Run one SEARCH_AD live test and confirm a new log row appears in API account history.
-7. Decide whether `feature/reports` is ready to merge into `dev`.
-8. Run `리포트_수동검증_정리.bat` after the session.
+3. If useful, run `리포트_상태캡처.bat` to save the current local validation state.
+4. If useful, run `리포트_상태비교.bat` to compare the latest capture against the current baseline.
+5. Verify `feature/reports` UI rendering in browser and do a final report-branch UX pass.
+6. Test saved report presets, filter reset behavior, and empty-state recovery actions.
+7. Test both CSV downloads and confirm the exported filter summary matches the visible filters.
+8. Run one SEARCH_AD live test and confirm a new log row appears in API account history.
+9. Decide whether `feature/reports` is ready to merge into `dev`.
+10. Run `리포트_수동검증_정리.bat` after the session.
 
 ## 5. Report branch verification checklist
 
@@ -132,6 +134,9 @@ npm run dev
 - Latest automated validation snapshot: [REPORT_MERGE_VALIDATION_2026-07-18.md](D:\Codex\NaverNameSeoTracker\REPORT_MERGE_VALIDATION_2026-07-18.md)
 - Quick browser test entry point: [docs/REPORT_MANUAL_VALIDATION_QUICKSTART.md](D:\Codex\NaverNameSeoTracker\docs\REPORT_MANUAL_VALIDATION_QUICKSTART.md)
 - Validation operations guide: [docs/REPORT_VALIDATION_OPERATIONS.md](D:\Codex\NaverNameSeoTracker\docs\REPORT_VALIDATION_OPERATIONS.md)
+- Validation toolbox launcher: [리포트_검증_도구모음.bat](D:\Codex\NaverNameSeoTracker\리포트_검증_도구모음.bat)
 - One-click validation starter: [리포트_수동검증_시작.bat](D:\Codex\NaverNameSeoTracker\리포트_수동검증_시작.bat)
 - Smoke check launcher: [리포트_스모크체크.bat](D:\Codex\NaverNameSeoTracker\리포트_스모크체크.bat)
+- Status capture launcher: [리포트_상태캡처.bat](D:\Codex\NaverNameSeoTracker\리포트_상태캡처.bat)
+- Status compare launcher: [리포트_상태비교.bat](D:\Codex\NaverNameSeoTracker\리포트_상태비교.bat)
 - Validation cleanup launcher: [리포트_수동검증_정리.bat](D:\Codex\NaverNameSeoTracker\리포트_수동검증_정리.bat)

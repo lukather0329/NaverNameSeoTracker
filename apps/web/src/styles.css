@@ -1,6 +1,7 @@
 :root {
   font-family: "Inter", "Pretendard", "Segoe UI", sans-serif;
   color: #1b2559;
+  font-size: 14px;
   line-height: 1.5;
   font-weight: 400;
   background:
@@ -45,7 +46,8 @@ body {
 
 button,
 input,
-select {
+select,
+textarea {
   font: inherit;
 }
 
@@ -349,6 +351,14 @@ select {
   gap: 12px;
 }
 
+.section-heading > * {
+  min-width: 0;
+}
+
+.section-heading > :first-child {
+  flex: 1 1 auto;
+}
+
 .helper-copy {
   margin: 10px 0 0;
   color: var(--text-soft);
@@ -369,6 +379,26 @@ select {
   font-size: 16px;
 }
 
+
+.experiment-focus-card {
+  margin-bottom: 18px;
+}
+
+.experiment-focus-card p {
+  margin: 0;
+  color: var(--text-main);
+  line-height: 1.6;
+}
+
+.experiment-filter-actions {
+  margin-top: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.experiment-filter-actions .action-button {
+  min-width: 154px;
+}
 .type-guide-card p {
   margin: 0;
   color: var(--text-soft);
@@ -434,10 +464,12 @@ select {
 
 .account-summary-grid {
   margin-top: 4px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .account-focus-grid {
   margin-top: 2px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .compact-card {
@@ -450,7 +482,8 @@ select {
 }
 
 .compact-card small {
-  line-height: 1.5;
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .focus-card.failed {
@@ -499,8 +532,17 @@ select {
 
 .account-form {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 14px;
+}
+
+.account-form > * {
+  min-width: 0;
+}
+
+.account-form > .action-button {
+  min-height: 48px;
+  align-self: stretch;
 }
 
 .account-form label {
@@ -546,9 +588,9 @@ select {
 .field-helper {
   margin: 0;
   color: var(--text-soft);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
-  line-height: 1.5;
+  line-height: 1.45;
 }
 
 .account-form input,
@@ -591,6 +633,22 @@ select {
   align-items: center;
 }
 
+.grid-cell .inline-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  min-width: 170px;
+}
+
+.grid-cell .inline-actions .action-button {
+  width: 100%;
+  min-height: 38px;
+  justify-content: center;
+  padding: 10px 12px;
+  font-size: 12px;
+  box-sizing: border-box;
+}
+
 .feedback-banner {
   padding: 14px 16px;
   border: 1px solid rgba(224, 229, 250, 0.96);
@@ -627,8 +685,12 @@ select {
   display: flex;
   justify-content: space-between;
   gap: 14px;
-  align-items: center;
+  align-items: flex-start;
   flex-wrap: wrap;
+}
+
+.account-filter-bar .filter-toggle {
+  margin-left: auto;
 }
 
 .account-filter-chip-row {
@@ -671,12 +733,26 @@ select {
 }
 
 .account-filter-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  padding: 13px 15px;
+  border: 1px solid rgba(224, 229, 250, 0.96);
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(247, 249, 255, 0.94));
   color: var(--text-soft);
-  font-size: 14px;
+  font-size: 12px;
+}
+
+.account-filter-summary .inline-link-button {
+  margin-left: auto;
 }
 
 .account-filter-summary strong {
   color: var(--text-main);
+  font-size: 17px;
+  line-height: 1;
 }
 
 .report-filter-summary-block {
@@ -726,6 +802,37 @@ select {
 .next-action-card strong {
   font-size: 18px;
   color: var(--text-main);
+}
+.import-log-card {
+  gap: 14px;
+}
+
+.import-log-list {
+  display: grid;
+  gap: 10px;
+}
+
+.import-log-item {
+  display: grid;
+  gap: 8px;
+  padding: 14px 16px;
+  border: 1px solid rgba(224, 229, 250, 0.96);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.import-log-item strong {
+  font-size: 14px;
+  color: var(--text-main);
+}
+
+.import-log-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  color: var(--text-soft);
+  font-size: 12px;
 }
 
 .checklist-success {
@@ -863,7 +970,7 @@ select {
 }
 
 .log-panel .grid-shell {
-  max-height: 320px;
+  max-height: 420px;
 }
 
 .log-panel h3 {
@@ -880,9 +987,36 @@ select {
   .report-hero {
     grid-template-columns: 1fr;
   }
+
+  .account-summary-grid,
+  .account-focus-grid,
+  .account-form {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 960px) {
+  .grid-cell .inline-actions {
+    min-width: 140px;
+  }
+
+  .account-filter-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  padding: 13px 15px;
+  border: 1px solid rgba(224, 229, 250, 0.96);
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(247, 249, 255, 0.94));
+  color: var(--text-soft);
+  font-size: 12px;
+}
+
+  .account-filter-summary .inline-link-button,
+  .account-filter-bar .filter-toggle {
+    margin-left: 0;
+  }
   .app-shell {
     grid-template-columns: 1fr;
     padding: 16px;
@@ -897,8 +1031,13 @@ select {
   .content {
     padding: 0;
   }
-
   .card-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .account-form,
+  .account-summary-grid,
+  .account-focus-grid {
     grid-template-columns: 1fr;
   }
 
@@ -1049,6 +1188,22 @@ select {
   color: #9b6a00;
 }
 
+.account-registration-help {
+  margin-bottom: 18px;
+}
+
+.account-registration-help .guide-chip-row {
+  margin-top: 2px;
+}
+
+.field-inline-note {
+  margin: -2px 0 0;
+  color: var(--text-soft);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
 .filter-summary {
   display: inline-flex;
   align-items: center;
@@ -1100,4 +1255,289 @@ select {
   font-weight: 700;
   cursor: pointer;
   padding: 0;
+}
+
+
+
+.product-filter-grid {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  align-items: end;
+}
+
+.product-filter-toggle {
+  display: grid;
+  gap: 8px;
+}
+
+.product-filter-actions {
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.product-filter-helper {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.product-summary-bar {
+  align-items: center;
+}
+
+.table-checkbox {
+  display: inline-grid;
+  justify-items: start;
+  gap: 6px;
+  color: var(--text-soft);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.table-checkbox input {
+  width: 16px;
+  height: 16px;
+  accent-color: #7551ff;
+}
+
+.table-checkbox span {
+  line-height: 1.2;
+}
+
+
+.grid-link-button {
+  text-align: left;
+}
+
+.product-detail-card {
+  gap: 16px;
+}
+
+.product-detail-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+}
+
+.product-detail-item {
+  display: grid;
+  gap: 8px;
+  padding: 18px;
+  border-radius: 18px;
+  border: 1px solid rgba(224, 229, 250, 0.96);
+  background: rgba(255, 255, 255, 0.94);
+}
+
+.product-detail-item span {
+  font-size: 12px;
+  font-weight: 800;
+  color: #4318ff;
+}
+
+.product-detail-item strong {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-main);
+}
+
+.product-detail-wide {
+  grid-column: span 2;
+}
+
+
+.product-history-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.product-history-card {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+  border: 1px solid rgba(224, 229, 250, 0.96);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.94);
+}
+
+.history-list {
+  display: grid;
+  gap: 10px;
+}
+
+.history-item {
+  display: grid;
+  gap: 8px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: rgba(244, 247, 254, 0.78);
+}
+
+.history-item strong {
+  font-size: 14px;
+  color: var(--text-main);
+}
+
+.history-item span {
+  color: var(--text-soft);
+  line-height: 1.5;
+}
+
+.recommendation-card {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid rgba(117, 81, 255, 0.14);
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(248, 250, 255, 0.98), rgba(241, 245, 255, 0.94));
+}
+
+.recommendation-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.recommendation-header strong {
+  display: block;
+  margin-top: 4px;
+  color: var(--text-main);
+  font-size: 16px;
+}
+
+.recommendation-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.recommendation-badge.success {
+  color: #046c52;
+  background: rgba(5, 205, 153, 0.16);
+}
+
+.recommendation-badge.warning {
+  color: #8a5300;
+  background: rgba(255, 181, 71, 0.2);
+}
+
+.recommendation-badge.neutral {
+  color: #4318ff;
+  background: rgba(117, 81, 255, 0.12);
+}
+
+.recommendation-summary {
+  margin: 0;
+  color: var(--text-main);
+  line-height: 1.65;
+}
+
+.recommendation-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.recommendation-list {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  color: var(--text-soft);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.recommendation-list li + li {
+  margin-top: 4px;
+}
+
+.product-detail-item input,
+.product-detail-item textarea {
+  width: 100%;
+  padding: 12px 14px;
+  font: inherit;
+  color: var(--text-main);
+  border: 1px solid rgba(224, 229, 250, 0.96);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.98);
+}
+
+.product-detail-item textarea {
+  min-height: 96px;
+  resize: vertical;
+}
+
+
+.product-comparison-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.title-compare-card {
+  display: grid;
+  gap: 12px;
+}
+
+.title-compare-card div {
+  display: grid;
+  gap: 8px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: rgba(244, 247, 254, 0.78);
+}
+
+.title-compare-card p {
+  margin: 0;
+  color: var(--text-main);
+  line-height: 1.6;
+}
+
+.compare-label {
+  font-size: 12px;
+  font-weight: 800;
+  color: #4318ff;
+}
+
+.compare-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.compare-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.compare-chip.added {
+  color: #046c52;
+  background: rgba(5, 205, 153, 0.14);
+}
+
+.compare-chip.removed {
+  color: #8f231b;
+  background: rgba(238, 93, 80, 0.14);
+}
+
+.compare-chip.keyword {
+  color: #4318ff;
+  background: rgba(117, 81, 255, 0.12);
+}
+
+.compare-chip.neutral {
+  color: var(--text-soft);
+  background: rgba(224, 229, 250, 0.8);
 }

@@ -1,4 +1,4 @@
-import type { FormEvent } from "react";
+﻿import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
 import type {
   ApiAccount,
@@ -8,17 +8,23 @@ import type {
   RankTrackingJob,
   RankTrackingResult,
   SeoExperiment,
-  SystemLogEntry
+  SystemLogEntry,
+  TitleChangeLog
 } from "@naver-seo-tracker/shared";
 import { DataGrid } from "./components/DataGrid";
+import type { DecisionProjectionResponse, ProductImportResponse } from "./lib/api";
 import { SparklineBars } from "./components/SparklineBars";
 import { StatusBadge } from "./components/StatusBadge";
 import {
   createApiAccount,
+  createExperimentDraft,
   fetchSnapshot,
+  importCommerceProducts,
+  runDecisionProjection,
   runTrackingJob,
   testApiAccountConnection,
-  updateApiAccount
+  updateApiAccount,
+  updateProduct
 } from "./lib/api";
 
 type ViewKey = "dashboard" | "accounts" | "products" | "experiments" | "tracking" | "results" | "reports";
@@ -189,6 +195,7 @@ export function App() {
   const [snapshot, setSnapshot] = useState<AppSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [focusExperimentId, setFocusExperimentId] = useState<string | null>(null);
 
   useEffect(() => {
     void loadSnapshot();
@@ -216,6 +223,10 @@ export function App() {
     await loadSnapshot();
   }
 
+  async function handleUpdateApiAccount(accountId: string, input: Partial<ApiAccountFormInput>) {
+    await updateApiAccount(accountId, input);
+    await loadSnapshot();
+  }
   async function handleTestApiAccount(accountId: string) {
     const result = await testApiAccountConnection(accountId);
     await loadSnapshot();
@@ -227,6 +238,40 @@ export function App() {
       isActive: !account.isActive
     });
     await loadSnapshot();
+  }
+
+  async function handleImportCommerceProducts(apiAccountId?: string) {
+    const result = await importCommerceProducts(apiAccountId);
+    await loadSnapshot();
+    return result;
+  }
+  async function handleCreateExperimentDraft(product: Product) {
+    const experiment = await createExperimentDraft({
+      name: product.currentTitle + ' SEO ??',
+      productId: product.id,
+      beforeTitle: product.currentTitle,
+      afterTitle: product.seoOptimizedTitle?.trim() || product.currentTitle,
+      trackingInterval: "60_MINUTES",
+      startDate: new Date().toISOString(),
+      minObservationHours: 24,
+      notes: '?? ?? ???? ??? ??'
+    });
+    setFocusExperimentId(typeof experiment?.id === 'string' ? experiment.id : null);
+    await loadSnapshot();
+    return experiment;
+  }
+
+  async function handleUpdateProduct(productId: string, input: { seoOptimizedTitle?: string; primaryKeyword?: string; trackingKeywords?: string[] }) {
+    await updateProduct(productId, input);
+    await loadSnapshot();
+  }
+
+  async function handleRunDecisionProjection(productId: string, input: { seoTitle?: string; primaryKeyword?: string; trackingKeywords?: string[]; targetRank?: number; iterations?: number; seed?: number; horizonDays?: number }) {
+    return runDecisionProjection(productId, input);
+  }
+
+  function handleOpenExperimentsView() {
+    setView("experiments");
   }
 
   return (
@@ -264,12 +309,13 @@ export function App() {
                 accounts={snapshot.apiAccounts}
                 systemLogs={snapshot.systemLogs ?? []}
                 onCreateAccount={handleCreateApiAccount}
+                onUpdateAccount={handleUpdateApiAccount}
                 onTestAccount={handleTestApiAccount}
                 onToggleAccount={handleToggleApiAccount}
               />
             )}
-            {view === "products" && <ProductsView products={snapshot.products} />}
-            {view === "experiments" && <ExperimentsView experiments={snapshot.experiments} />}
+            {view === "products" && <ProductsView products={snapshot.products} experiments={snapshot.experiments} titleChangeLogs={snapshot.titleChangeLogs} apiAccounts={snapshot.apiAccounts} systemLogs={snapshot.systemLogs ?? []} onImportProducts={handleImportCommerceProducts} onCreateExperimentDraft={handleCreateExperimentDraft} onUpdateProduct={handleUpdateProduct} onRunDecisionProjection={handleRunDecisionProjection} onOpenExperimentsView={handleOpenExperimentsView} />}
+            {view === "experiments" && <ExperimentsView experiments={snapshot.experiments} focusExperimentId={focusExperimentId} />}
             {view === "tracking" && <TrackingJobsView jobs={snapshot.jobs} onRunJob={handleRunJob} />}
             {view === "results" && <ResultsView results={snapshot.results} products={snapshot.products} />}
             {view === "reports" && <ReportsView snapshot={snapshot} />}
@@ -318,12 +364,14 @@ function ApiAccountsView({
   accounts,
   systemLogs,
   onCreateAccount,
+  onUpdateAccount,
   onTestAccount,
   onToggleAccount
 }: {
   accounts: ApiAccount[];
   systemLogs: SystemLogEntry[];
   onCreateAccount: (input: ApiAccountFormInput) => Promise<void>;
+  onUpdateAccount: (accountId: string, input: Partial<ApiAccountFormInput>) => Promise<void>;
   onTestAccount: (accountId: string) => Promise<{ ok: boolean; message: string; mode?: string; statusCode?: number; details?: string }>;
   onToggleAccount: (account: ApiAccount) => Promise<void>;
 }) {
@@ -334,6 +382,7 @@ function ApiAccountsView({
   const [activeOnly, setActiveOnly] = useState(false);
   const [logFilter, setLogFilter] = useState<AccountLogFilterValue>("ALL");
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
+  const [editingAccountId, setEditingAccountId] = useState<string | null>(null);
   const accountGuide = accountTypeGuides[form.type];
   const saveTimingGuide = accountSaveTimingGuides[form.type];
   const recentAccountTestLogs: AccountTestLogViewRow[] = (systemLogs ?? [])
@@ -352,6 +401,7 @@ function ApiAccountsView({
   const readinessSummary = buildAccountReadinessSummary(accounts, recentAccountTestLogs.length);
   const logFocusCards = buildAccountLogFocusCards(recentAccountTestLogs);
   const selectedAccount = accounts.find((account) => account.id === selectedAccountId) ?? null;
+  const editingAccount = accounts.find((account) => account.id === editingAccountId) ?? null;
   const filteredLogRows = recentAccountTestLogs.filter((row) => {
     const logFilterMatch =
       logFilter === "ALL"
@@ -375,12 +425,27 @@ function ApiAccountsView({
     ? `필터된 로그 ${filteredLogRows.length}건과 연결됨`
     : null;
   const logScopeSummary = selectedAccount ? `${selectedAccount.name} 계정 로그만 표시 중` : null;
-  const formReadiness = buildFormReadinessPreview(form);
+  const formReadiness = buildFormReadinessPreview(form, editingAccount);
   const canSaveAccount = formReadiness.state !== "INCOMPLETE";
   const currentRequiredFields = getCurrentRequiredFields(form.type);
   const requiredFieldSet = new Set(currentRequiredFields);
   const nextActionGuide = buildNextActionGuide(accounts, formReadiness, form.type);
   const fieldHints = buildFieldHints(form.type);
+  const accountSaveSummaryChips = form.type === "COMMERCE"
+    ? ["계정명", "유형", "클라이언트 ID", "클라이언트 시크릿", "스토어 ID 또는 채널 ID 1개"]
+    : form.type === "SEARCH_AD"
+      ? ["계정명", "유형", "클라이언트 ID", "클라이언트 시크릿", "액세스 라이선스", "시크릿 키", "고객 ID"]
+      : ["계정명", "유형", "클라이언트 ID", "클라이언트 시크릿"];
+  const accountOptionalSummaryChips = form.type === "COMMERCE"
+    ? ["스토어 ID와 채널 ID를 둘 다 알고 있으면 같이 저장 가능", "액세스 라이선스와 시크릿 키는 커머스 저장에 필요하지 않음"]
+    : form.type === "SEARCH_AD"
+      ? ["검색광고 API는 스토어 ID와 채널 ID를 사용하지 않음"]
+      : ["CUSTOM 유형은 최소 연결 정보만 먼저 저장", "추가 인증값은 이후 확장 시점에 연결"];
+  const accountRegistrationNote = form.type === "COMMERCE"
+    ? "커머스 API는 클라이언트 ID, 클라이언트 시크릿, 스토어 ID 또는 채널 ID 중 1개만 있으면 저장할 수 있으며, 저장 후 바로 실테스트와 상품 불러오기를 진행할 수 있습니다."
+    : form.type === "SEARCH_AD"
+      ? "검색광고 API는 고객 ID까지 포함한 검색광고 전용 인증값을 모두 채워야 저장할 수 있습니다."
+      : "CUSTOM 유형은 계정명, 유형, 클라이언트 ID, 클라이언트 시크릿만 저장합니다.";
   const accountFilterOptions: Array<{ value: AccountFilterValue; label: string }> = [
     { value: "ALL", label: `전체 (${accounts.length})` },
     { value: "LIVE_READY", label: `실테스트 가능 (${accounts.filter((account) => getAccountReadinessState(account) === "LIVE_READY").length})` },
@@ -394,9 +459,32 @@ function ApiAccountsView({
     { value: "REAL", label: `실연동 (${recentAccountTestLogs.filter((row) => row.testMode === "REAL").length})` },
     { value: "VALIDATION", label: `검증 (${recentAccountTestLogs.filter((row) => row.testMode === "VALIDATION").length})` }
   ];
-  const needsAdvancedCredentials = form.type !== "CUSTOM";
+  const needsAdvancedCredentials = form.type === "SEARCH_AD";
   const needsCustomerId = form.type === "SEARCH_AD";
   const needsCommerceTargets = form.type === "COMMERCE";
+
+  function handleStartEdit(account: ApiAccount) {
+    setEditingAccountId(account.id);
+    setFeedback(null);
+    setForm({
+      name: account.name,
+      type: account.type,
+      clientId: "",
+      clientSecret: "",
+      accessLicense: "",
+      secretKey: "",
+      customerId: account.customerId ?? "",
+      storeId: account.storeId ?? "",
+      channelId: account.channelId ?? "",
+      isActive: account.isActive
+    });
+  }
+
+  function handleCancelEdit() {
+    setEditingAccountId(null);
+    setFeedback(null);
+    setForm(defaultApiAccountForm);
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -413,17 +501,48 @@ function ApiAccountsView({
     setSubmitting(true);
 
     try {
-      await onCreateAccount(form);
+      if (editingAccountId) {
+        const updateInput: Partial<ApiAccountFormInput> = {
+          name: form.name,
+          type: form.type,
+          customerId: form.customerId,
+          storeId: form.storeId,
+          channelId: form.channelId,
+          isActive: form.isActive
+        };
+
+        if (form.clientId.trim()) {
+          updateInput.clientId = form.clientId;
+        }
+        if (form.clientSecret.trim()) {
+          updateInput.clientSecret = form.clientSecret;
+        }
+        if ((form.accessLicense ?? "").trim()) {
+          updateInput.accessLicense = form.accessLicense;
+        }
+        if ((form.secretKey ?? "").trim()) {
+          updateInput.secretKey = form.secretKey;
+        }
+
+        await onUpdateAccount(editingAccountId, updateInput);
+        setFeedback({
+          tone: "success",
+          message: "API 계정이 수정되었습니다."
+        });
+        setEditingAccountId(null);
+      } else {
+        await onCreateAccount(form);
+        setFeedback({
+          tone: "success",
+          message: "API 계정이 저장되었습니다."
+        });
+      }
+
       setForm(defaultApiAccountForm);
-      setFeedback({
-        tone: "success",
-        message: "API account saved."
-      });
     } finally {
       setSubmitting(false);
     }
   }
-
   async function handleTest(accountId: string) {
     const result = await onTestAccount(accountId);
     const suffix = [result.mode ? `mode=${result.mode}` : "", result.statusCode ? `status=${result.statusCode}` : "", result.details ?? ""]
@@ -440,7 +559,7 @@ function ApiAccountsView({
         <div>
           <p className="eyebrow">연결 상태</p>
           <h2>네이버 API 계정</h2>
-          <p className="helper-copy">SEARCH_AD는 실제 외부 API 테스트를 수행하고, COMMERCE와 CUSTOM은 현재 검증 전용 점검만 지원합니다.</p>
+          <p className="helper-copy">SEARCH_AD와 COMMERCE는 실제 외부 API 테스트를 수행하며, CUSTOM은 현재 기본 검증 점검만 지원합니다.</p>
           <div className="type-guide-card">
             <strong>{accountGuide.modeLabel}</strong>
             <p>{accountGuide.note}</p>
@@ -521,6 +640,32 @@ function ApiAccountsView({
           <p className="checklist-success">현재 흐름에서 필요한 항목이 모두 입력되었습니다.</p>
         )}
       </div>
+      <div className="report-filter-warning account-registration-help">
+        <strong>{editingAccount ? "현재 수정 기준" : "현재 저장 기준"}</strong>
+        <p>{editingAccount ? "수정 모드에서는 기존에 저장된 비밀값을 유지할 수 있습니다. 새 값을 입력한 항목만 업데이트됩니다." : "현재 화면에서는 선택한 유형의 필수값이 모두 채워져야 저장 단계로 넘어갑니다. 커머스 API는 클라이언트 ID, 클라이언트 시크릿, 스토어 ID 또는 채널 ID 1개가 있으면 저장할 수 있습니다."}</p>
+        <div className="guide-chip-row">
+          {accountSaveSummaryChips.map((field) => (
+            <span key={field} className="guide-chip">{field}</span>
+          ))}
+        </div>
+        <p>{accountRegistrationNote}</p>
+        <div className="guide-chip-row">
+          {accountOptionalSummaryChips.map((field) => (
+            <span key={field} className="guide-chip muted">{field}</span>
+          ))}
+        </div>
+        <div className="guide-chip-row account-link-row">
+          <a className="inline-link-button" href="https://apicenter.commerce.naver.com/ko/" target="_blank" rel="noreferrer">{"커머스 API 센터 열기"}</a>
+          <a className="inline-link-button" href="https://apicenter.commerce.naver.com/docs/introduction" target="_blank" rel="noreferrer">{"커머스 API 문서 보기"}</a>
+          <a className="inline-link-button" href="https://naver.github.io/searchad-apidoc/" target="_blank" rel="noreferrer">{"검색광고 API 문서 보기"}</a>
+          <a className="inline-link-button" href="https://ads.naver.com/help/faq/302" target="_blank" rel="noreferrer">{"검색광고 API 안내 보기"}</a>
+        </div>
+      </div>
+      {editingAccount && (
+        <div className="feedback-banner info">
+          <strong>{editingAccount.name}</strong> 계정을 수정 중입니다. 보안값은 화면에 표시되지 않으며, 비워두면 기존 값이 유지됩니다.
+        </div>
+      )}
       <form className="account-form" onSubmit={handleSubmit}>
         <label className={getFormFieldClassName(requiredFieldSet, "계정명")}>
           <span>{renderFieldLabel("계정명", requiredFieldSet)}</span>
@@ -540,24 +685,24 @@ function ApiAccountsView({
         </label>
         <label className={getFormFieldClassName(requiredFieldSet, "클라이언트 ID")}>
           <span>{renderFieldLabel("클라이언트 ID", requiredFieldSet)}</span>
-          <input value={form.clientId} placeholder={fieldHints.clientId.placeholder} onChange={(event) => setForm({ ...form, clientId: event.target.value })} required />
+          <input value={form.clientId} placeholder={editingAccount ? "새 클라이언트 ID 입력 시에만 변경" : fieldHints.clientId.placeholder} onChange={(event) => setForm({ ...form, clientId: event.target.value })} required={!editingAccount} />
           <small className="field-helper">{fieldHints.clientId.helper}</small>
         </label>
         <label className={getFormFieldClassName(requiredFieldSet, "클라이언트 시크릿")}>
           <span>{renderFieldLabel("클라이언트 시크릿", requiredFieldSet)}</span>
-          <input value={form.clientSecret} placeholder={fieldHints.clientSecret.placeholder} onChange={(event) => setForm({ ...form, clientSecret: event.target.value })} required />
+          <input value={form.clientSecret} placeholder={editingAccount ? "새 클라이언트 시크릿 입력 시에만 변경" : fieldHints.clientSecret.placeholder} onChange={(event) => setForm({ ...form, clientSecret: event.target.value })} required={!editingAccount} />
           <small className="field-helper">{fieldHints.clientSecret.helper}</small>
         </label>
         {needsAdvancedCredentials && (
           <>
             <label className={getFormFieldClassName(requiredFieldSet, "액세스 라이선스")}>
               <span>{renderFieldLabel("액세스 라이선스", requiredFieldSet)}</span>
-              <input value={form.accessLicense ?? ""} placeholder={fieldHints.accessLicense.placeholder} onChange={(event) => setForm({ ...form, accessLicense: event.target.value })} />
+              <input value={form.accessLicense ?? ""} placeholder={editingAccount ? "새 액세스 라이선스 입력 시에만 변경" : fieldHints.accessLicense.placeholder} onChange={(event) => setForm({ ...form, accessLicense: event.target.value })} />
               <small className="field-helper">{fieldHints.accessLicense.helper}</small>
             </label>
             <label className={getFormFieldClassName(requiredFieldSet, "시크릿 키")}>
               <span>{renderFieldLabel("시크릿 키", requiredFieldSet)}</span>
-              <input value={form.secretKey ?? ""} placeholder={fieldHints.secretKey.placeholder} onChange={(event) => setForm({ ...form, secretKey: event.target.value })} />
+              <input value={form.secretKey ?? ""} placeholder={editingAccount ? "새 시크릿 키 입력 시에만 변경" : fieldHints.secretKey.placeholder} onChange={(event) => setForm({ ...form, secretKey: event.target.value })} />
               <small className="field-helper">{fieldHints.secretKey.helper}</small>
             </label>
           </>
@@ -593,7 +738,7 @@ function ApiAccountsView({
           disabled={submitting || !canSaveAccount}
           title={canSaveAccount ? "계정 저장" : formReadiness.missingFields.join(", ")}
         >
-          {submitting ? "저장 중..." : canSaveAccount ? "계정 저장" : "필수 항목 입력 필요"}
+          {submitting ? (editingAccount ? "수정 중..." : "저장 중...") : canSaveAccount ? (editingAccount ? "계정 수정 저장" : "계정 저장") : "필수 항목 입력 필요"}
         </button>
       </form>
       <div className="form-readiness-card">
@@ -685,11 +830,11 @@ function ApiAccountsView({
           {
             key: "actions",
             title: "상세",
-            width: 240,
+            width: 340,
             render: (row) => {
               const readiness = getAccountReadinessState(row);
               const canTest = readiness !== "INCOMPLETE";
-              const testLabel = readiness === "LIVE_READY" ? "실연동 테스트 실행" : "검증 점검 실행";
+              const testLabel = row.type === "COMMERCE" ? "커머스 실테스트 실행" : readiness === "LIVE_READY" ? "실연동 테스트 실행" : "검증 점검 실행";
 
               return (
                 <div className="inline-actions">
@@ -778,72 +923,842 @@ function ApiAccountsView({
   );
 }
 
-function ProductsView({ products }: { products: Product[] }) {
+function ProductsView({
+  products,
+  experiments,
+  titleChangeLogs,
+  apiAccounts,
+  systemLogs,
+  onImportProducts,
+  onCreateExperimentDraft,
+  onUpdateProduct,
+  onRunDecisionProjection,
+  onOpenExperimentsView
+}: {
+  products: Product[];
+  experiments: SeoExperiment[];
+  titleChangeLogs: TitleChangeLog[];
+  apiAccounts: ApiAccount[];
+  systemLogs: SystemLogEntry[];
+  onImportProducts: (apiAccountId?: string) => Promise<ProductImportResponse>;
+  onCreateExperimentDraft: (product: Product) => Promise<void>;
+  onUpdateProduct: (productId: string, input: { seoOptimizedTitle?: string; primaryKeyword?: string; trackingKeywords?: string[] }) => Promise<void>;
+  onRunDecisionProjection: (productId: string, input: { seoTitle?: string; primaryKeyword?: string; trackingKeywords?: string[]; targetRank?: number; iterations?: number; seed?: number; horizonDays?: number }) => Promise<DecisionProjectionResponse>;
+  onOpenExperimentsView: () => void;
+}) {
+  const [importing, setImporting] = useState(false);
+  const [creatingExperimentId, setCreatingExperimentId] = useState('');
+  const [savingProductDetail, setSavingProductDetail] = useState(false);
+  const [feedback, setFeedback] = useState<{ tone: FeedbackTone; message: string } | null>(null);
+  const [selectedImportAccountId, setSelectedImportAccountId] = useState('');
+  const [productSearchQuery, setProductSearchQuery] = useState('');
+  const [productStatusFilter, setProductStatusFilter] = useState<'ALL' | Product['testStatus']>('ALL');
+  const [categoryFilter, setCategoryFilter] = useState('ALL');
+  const [seoReadyOnly, setSeoReadyOnly] = useState(false);
+  const [selectedDetailProductId, setSelectedDetailProductId] = useState<string | null>(products[0]?.id ?? null);
+  const [detailForm, setDetailForm] = useState({ seoOptimizedTitle: '', primaryKeyword: '', trackingKeywords: '' });
+  const [runningDecisionProjection, setRunningDecisionProjection] = useState(false);
+  const [decisionProjection, setDecisionProjection] = useState<DecisionProjectionResponse | null>(null);
+  const [lastImportResult, setLastImportResult] = useState<ProductImportResponse | null>(null);
+  const [focusSeoPendingAfterImport, setFocusSeoPendingAfterImport] = useState(false);
+
+  const activeCommerceAccounts = apiAccounts.filter((account) => account.type === 'COMMERCE' && account.isActive);
+  const recentImportLogs = systemLogs.filter((log) => log.scope === 'product-import').slice(0, 5);
+  const recentImportLogRows = recentImportLogs.map((log) => ({
+    ...log,
+    detailSummary: formatParsedProductImportMeta(parseProductImportMeta(log.metaJson), log.metaJson)
+  }));
+  const selectedImportAccount = activeCommerceAccounts.find((account) => account.id === selectedImportAccountId) ?? null;
+  const selectedSellerIdentifier = lastImportResult?.sellerIdentifier ?? selectedImportAccount?.storeId ?? selectedImportAccount?.channelId ?? null;
+  const latestImportLog = recentImportLogRows[0] ?? null;
+  const syncSummaryItems = [
+    {
+      label: '\uB3D9\uAE30\uD654 \uACC4\uC815',
+      value: selectedImportAccount?.name ?? (lastImportResult?.accountName ?? '\uBBF8\uC120\uD0DD'),
+      caption: selectedImportAccount ? '\uD604\uC7AC \uBD88\uB7EC\uC624\uAE30 \uB300\uC0C1 \uACC4\uC815' : '\uACC4\uC815\uC744 \uC120\uD0DD\uD558\uBA74 \uBC14\uB85C \uB3D9\uAE30\uD654\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.'
+    },
+    {
+      label: '\uC2A4\uD1A0\uC5B4 \uC2DD\uBCC4\uAC12',
+      value: selectedSellerIdentifier ?? '\uBBF8\uD655\uC778',
+      caption: selectedSellerIdentifier ? '\uC2A4\uD1A0\uC5B4 ID \uB610\uB294 \uCC44\uB110 ID \uAE30\uC900' : '\uACC4\uC815\uC5D0 \uC2A4\uD1A0\uC5B4 ID \uB610\uB294 \uCC44\uB110 ID\uB97C \uC785\uB825\uD574 \uC8FC\uC138\uC694.'
+    },
+    {
+      label: '\uCD5C\uADFC \uBC18\uC601 \uAC74\uC218',
+      value: String(lastImportResult?.importedCount ?? 0),
+      caption: lastImportResult ? '\uC870\uD68C ' + lastImportResult.totalFetched + '\uAC1C / \uD398\uC774\uC9C0 ' + lastImportResult.pageCount + '\uD68C' : '\uC544\uC9C1 \uC2E4\uD589\uD55C \uB3D9\uAE30\uD654\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.'
+    },
+    {
+      label: '\uC2E0\uADDC / \uC5C5\uB370\uC774\uD2B8',
+      value: lastImportResult ? `${lastImportResult.createdCount} / ${lastImportResult.updatedCount}` : '- / -',
+      caption: lastImportResult ? '\uC81C\uC678 ' + lastImportResult.skippedCount + '\uAC1C \uD3EC\uD568' : '\uC2E0\uADDC \uC0DD\uC131 \uBC0F \uAE30\uC874 \uC0C1\uD488 \uAC31\uC2E0 \uC218'
+    },
+    {
+      label: '\uCD5C\uADFC \uB85C\uADF8',
+      value: String(recentImportLogRows.length),
+      caption: latestImportLog ? latestImportLog.message : '\uAE30\uB85D\uB41C \uB3D9\uAE30\uD654 \uB85C\uADF8\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.'
+    }
+  ];
+  const heroImportChips = [
+    selectedImportAccount?.name ? '\uACC4\uC815: ' + selectedImportAccount.name : '\uACC4\uC815 \uBBF8\uC120\uD0DD',
+    selectedSellerIdentifier ? '\uC2A4\uD1A0\uC5B4: ' + selectedSellerIdentifier : '\uC2A4\uD1A0\uC5B4 ID \uBBF8\uC785\uB825',
+    lastImportResult ? '\uBC18\uC601 ' + lastImportResult.importedCount + '\uAC1C / \uC870\uD68C ' + lastImportResult.totalFetched + '\uAC1C' : '\uCD5C\uADFC \uB3D9\uAE30\uD654 \uC5C6\uC74C'
+  ];
+  const categoryOptions = Array.from(new Set(products.map((product) => product.category?.trim()).filter((value): value is string => Boolean(value)))).sort((left, right) => left.localeCompare(right, 'ko'));
+  const filteredProducts = products.filter((product) => {
+    const query = productSearchQuery.trim().toLowerCase();
+    const matchesQuery =
+      query.length === 0 ||
+      product.currentTitle.toLowerCase().includes(query) ||
+      (product.seoOptimizedTitle ?? '').toLowerCase().includes(query) ||
+      (product.primaryKeyword ?? '').toLowerCase().includes(query) ||
+      product.smartStoreProductId.toLowerCase().includes(query) ||
+      (product.sellerManagementCode ?? '').toLowerCase().includes(query);
+    const matchesStatus = productStatusFilter === 'ALL' || product.testStatus === productStatusFilter;
+    const matchesCategory = categoryFilter === 'ALL' || (product.category?.trim() ?? '') === categoryFilter;
+    const matchesSeo = !seoReadyOnly || Boolean(product.seoOptimizedTitle?.trim());
+    return matchesQuery && matchesStatus && matchesCategory && matchesSeo;
+  });
+
+  const selectedDetailProduct =
+    filteredProducts.find((product) => product.id === selectedDetailProductId) ??
+    products.find((product) => product.id === selectedDetailProductId) ??
+    filteredProducts[0] ??
+    products[0] ??
+    null;
+  const selectedDetailIndex = selectedDetailProduct ? filteredProducts.findIndex((product) => product.id === selectedDetailProduct.id) : -1;
+  const previousDetailProduct = selectedDetailIndex > 0 ? filteredProducts[selectedDetailIndex - 1] : null;
+  const nextDetailProduct = selectedDetailIndex >= 0 && selectedDetailIndex < filteredProducts.length - 1 ? filteredProducts[selectedDetailIndex + 1] : null;
+  const seoPendingProducts = filteredProducts.filter((product) => !product.seoOptimizedTitle?.trim());
+  const nextSeoPendingProduct = selectedDetailIndex >= 0
+    ? filteredProducts.slice(selectedDetailIndex + 1).find((product) => !product.seoOptimizedTitle?.trim()) ?? seoPendingProducts[0] ?? null
+    : seoPendingProducts[0] ?? null;
+  const visibleSeoReadyCount = filteredProducts.filter((product) => Boolean(product.seoOptimizedTitle?.trim())).length;
+  const visibleSeoPendingCount = filteredProducts.length - visibleSeoReadyCount;
+  const detailProgressLabel = selectedDetailIndex >= 0 && filteredProducts.length > 0
+    ? '\uD604\uC7AC ' + (selectedDetailIndex + 1) + ' / ' + filteredProducts.length + ' \uBC88\uC9F8 \uC0C1\uD488'
+    : '\uC120\uD0DD\uB41C \uC0C1\uD488 \uC5C6\uC74C';
+  const hasActiveProductFilters = productSearchQuery.trim().length > 0 || productStatusFilter !== 'ALL' || categoryFilter !== 'ALL' || seoReadyOnly;
+  const relatedExperiments = selectedDetailProduct ? experiments.filter((experiment) => experiment.productId === selectedDetailProduct.id).slice(0, 5) : [];
+  const relatedTitleChangeLogs = selectedDetailProduct ? titleChangeLogs.filter((log) => log.productId === selectedDetailProduct.id).slice(0, 5) : [];
+  const titleComparison = buildTitleComparison(selectedDetailProduct?.currentTitle ?? '', detailForm.seoOptimizedTitle);
+  const keywordPreviewItems = buildKeywordPreview(detailForm.primaryKeyword, detailForm.trackingKeywords);
+  const monteCarloDraft = buildMonteCarloDraft({
+    product: selectedDetailProduct,
+    seoTitle: detailForm.seoOptimizedTitle,
+    primaryKeyword: detailForm.primaryKeyword,
+    trackingKeywords: keywordPreviewItems,
+    experimentCount: relatedExperiments.length,
+    titleChangeCount: relatedTitleChangeLogs.length
+  });
+  const monteCarloRecommendation = buildMonteCarloRecommendation(monteCarloDraft);
+  const monteCarloPayload = buildMonteCarloPayload({
+    product: selectedDetailProduct,
+    seoTitle: detailForm.seoOptimizedTitle,
+    primaryKeyword: detailForm.primaryKeyword,
+    trackingKeywords: keywordPreviewItems,
+    recommendation: monteCarloRecommendation,
+    experimentCount: relatedExperiments.length,
+    titleChangeCount: relatedTitleChangeLogs.length
+  });
+
+  useEffect(() => {
+    if (activeCommerceAccounts.length === 0) {
+      setSelectedImportAccountId('');
+      return;
+    }
+
+    if (!selectedImportAccountId || !activeCommerceAccounts.some((account) => account.id === selectedImportAccountId)) {
+      setSelectedImportAccountId(activeCommerceAccounts[0]?.id ?? '');
+    }
+  }, [activeCommerceAccounts, selectedImportAccountId]);
+
+  useEffect(() => {
+    if (!selectedDetailProductId || !products.some((product) => product.id === selectedDetailProductId)) {
+      setSelectedDetailProductId(products[0]?.id ?? null);
+    }
+  }, [products, selectedDetailProductId]);
+
+  useEffect(() => {
+    if (filteredProducts.length === 0) {
+      return;
+    }
+
+    if (!selectedDetailProductId || !filteredProducts.some((product) => product.id === selectedDetailProductId)) {
+      setSelectedDetailProductId(filteredProducts[0]?.id ?? null);
+    }
+  }, [filteredProducts, selectedDetailProductId]);
+
+  useEffect(() => {
+    if (!focusSeoPendingAfterImport || products.length === 0) {
+      return;
+    }
+
+    const firstSeoPendingProduct = products.find((product) => !product.seoOptimizedTitle?.trim()) ?? products[0] ?? null;
+    setSelectedDetailProductId(firstSeoPendingProduct?.id ?? null);
+    setFocusSeoPendingAfterImport(false);
+  }, [focusSeoPendingAfterImport, products]);
+
+  useEffect(() => {
+    setDetailForm({
+      seoOptimizedTitle: selectedDetailProduct?.seoOptimizedTitle ?? '',
+      primaryKeyword: selectedDetailProduct?.primaryKeyword ?? '',
+      trackingKeywords: selectedDetailProduct?.trackingKeywords.join(', ') ?? ''
+    });
+    setDecisionProjection(null);
+  }, [selectedDetailProduct]);
+
+  async function handleImportClick() {
+    if (!selectedImportAccountId) {
+      setFeedback({ tone: 'warning', message: '\uBA3C\uC800 COMMERCE \uACC4\uC815\uC744 \uC120\uD0DD\uD574 \uC8FC\uC138\uC694.' });
+      return;
+    }
+
+    try {
+      setImporting(true);
+      setFeedback({ tone: 'info', message: '\uC2A4\uB9C8\uD2B8\uC2A4\uD1A0\uC5B4 \uC0C1\uD488 \uBD88\uB7EC\uC624\uAE30\uB97C \uC2DC\uC791\uD569\uB2C8\uB2E4.' });
+      const result = await onImportProducts(selectedImportAccountId);
+      setLastImportResult(result);
+      setProductSearchQuery('');
+      setProductStatusFilter('ALL');
+      setCategoryFilter('ALL');
+      setSeoReadyOnly(false);
+      setFocusSeoPendingAfterImport(true);
+      setFeedback({ tone: 'success', message: '\uB3D9\uAE30\uD654 \uC644\uB8CC: \uC2A4\uD1A0\uC5B4 ' + result.sellerIdentifier + ' / \uC870\uD68C ' + result.totalFetched + '\uAC1C / \uBC18\uC601 ' + result.importedCount + '\uAC1C / \uC2E0\uADDC ' + result.createdCount + '\uAC1C / \uC5C5\uB370\uC774\uD2B8 ' + result.updatedCount + '\uAC1C / \uC81C\uC678 ' + result.skippedCount + '\uAC1C' });
+    } catch (error) {
+      setFeedback({ tone: 'error', message: error instanceof Error ? error.message : '\uC2A4\uB9C8\uD2B8\uC2A4\uD1A0\uC5B4 \uC0C1\uD488 \uBAA9\uB85D \uC870\uD68C\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4.' });
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  function handleResetProductFilters() {
+    setProductSearchQuery('');
+    setProductStatusFilter('ALL');
+    setCategoryFilter('ALL');
+    setSeoReadyOnly(false);
+    setFeedback({ tone: 'info', message: '\uC0C1\uD488 \uD544\uD130\uB97C \uCD08\uAE30\uD654\uD588\uC2B5\uB2C8\uB2E4.' });
+  }
+
+  function handleStartSeoPendingReview() {
+    setProductSearchQuery('');
+    setProductStatusFilter('ALL');
+    setCategoryFilter('ALL');
+    setSeoReadyOnly(false);
+    const firstSeoPendingProduct = products.find((product) => !product.seoOptimizedTitle?.trim()) ?? null;
+
+    if (!firstSeoPendingProduct) {
+      setFeedback({ tone: 'success', message: '\uBAA8\uB4E0 \uC0C1\uD488\uC5D0 SEO \uC785\uB825\uC774 \uC900\uBE44\uB418\uC5B4 \uC788\uC2B5\uB2C8\uB2E4.' });
+      return;
+    }
+
+    setSelectedDetailProductId(firstSeoPendingProduct.id);
+    setFeedback({ tone: 'info', message: '\uCCAB SEO \uBBF8\uC785\uB825 \uC0C1\uD488\uC73C\uB85C \uC774\uB3D9\uD588\uC2B5\uB2C8\uB2E4.' });
+  }
+
+  function handleSelectDetailProduct(productId: string | null) {
+    if (!productId) {
+      return;
+    }
+
+    setSelectedDetailProductId(productId);
+    setFeedback(null);
+  }
+
+  async function handleSaveProductDetail(moveToProductId?: string | null) {
+    if (!selectedDetailProduct) {
+      return;
+    }
+
+    try {
+      setSavingProductDetail(true);
+      await onUpdateProduct(selectedDetailProduct.id, {
+        seoOptimizedTitle: detailForm.seoOptimizedTitle.trim(),
+        primaryKeyword: detailForm.primaryKeyword.trim(),
+        trackingKeywords: detailForm.trackingKeywords.split(',').map((item) => item.trim()).filter(Boolean)
+      });
+      setFeedback({ tone: 'success', message: moveToProductId ? '\uC0C1\uD488 SEO \uC815\uBCF4\uB97C \uC800\uC7A5\uD558\uACE0 \uB2E4\uC74C \uAC80\uD1A0 \uC0C1\uD488\uC73C\uB85C \uC774\uB3D9\uD588\uC2B5\uB2C8\uB2E4.' : '\uC0C1\uD488 SEO \uC815\uBCF4\uB97C \uC800\uC7A5\uD588\uC2B5\uB2C8\uB2E4.' });
+      if (moveToProductId) {
+        handleSelectDetailProduct(moveToProductId);
+      }
+    } catch (error) {
+      setFeedback({ tone: 'error', message: error instanceof Error ? error.message : '\uC0C1\uD488 SEO \uC815\uBCF4 \uC800\uC7A5\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4.' });
+    } finally {
+      setSavingProductDetail(false);
+    }
+  }
+
+  async function handleCreateDraft(product: Product, moveToProductId?: string | null, openExperimentsView?: boolean) {
+    try {
+      setCreatingExperimentId(product.id);
+      const draftProduct = selectedDetailProduct && selectedDetailProduct.id === product.id
+        ? {
+            ...product,
+            seoOptimizedTitle: detailForm.seoOptimizedTitle.trim(),
+            primaryKeyword: detailForm.primaryKeyword.trim(),
+            trackingKeywords: detailForm.trackingKeywords.split(",").map((item) => item.trim()).filter(Boolean)
+          }
+        : product;
+      await onCreateExperimentDraft(draftProduct);
+      if (openExperimentsView) {
+        onOpenExperimentsView();
+      } else if (moveToProductId) {
+        handleSelectDetailProduct(moveToProductId);
+      }
+      setFeedback({
+        tone: "success",
+        message: openExperimentsView
+          ? "\uC2E4\uD5D8 \uCD08\uC548\uC744 \uB9CC\uB4E4\uACE0 \uC2E4\uD5D8 \uAD00\uB9AC \uD654\uBA74\uC73C\uB85C \uC774\uB3D9\uD588\uC2B5\uB2C8\uB2E4."
+          : moveToProductId
+            ? "\uC2E4\uD5D8 \uCD08\uC548\uC744 \uB9CC\uB4E4\uACE0 \uB2E4\uC74C \uAC80\uD1A0 \uC0C1\uD488\uC73C\uB85C \uC774\uB3D9\uD588\uC2B5\uB2C8\uB2E4."
+            : "\uC2E4\uD5D8 \uCD08\uC548\uC744 \uC0DD\uC131\uD588\uC2B5\uB2C8\uB2E4."
+      });
+    } catch (error) {
+      setFeedback({ tone: "error", message: error instanceof Error ? error.message : "\uC2E4\uD5D8 \uCD08\uC548 \uC0DD\uC131\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4." });
+    } finally {
+      setCreatingExperimentId("");
+    }
+  }
+
+  function handleExportProductsCsv() {
+    const headers = ['smartStoreProductId', 'sellerManagementCode', 'currentTitle', 'seoOptimizedTitle', 'primaryKeyword', 'trackingKeywords', 'price', 'testStatus', 'updatedAt'];
+    const rows = filteredProducts.map((product) => [
+      product.smartStoreProductId,
+      product.sellerManagementCode ?? '',
+      product.currentTitle,
+      product.seoOptimizedTitle ?? '',
+      product.primaryKeyword ?? '',
+      product.trackingKeywords.join(' | '),
+      String(product.price),
+      product.testStatus,
+      product.updatedAt
+    ]);
+    downloadCsv('products-export.csv', [headers, ...rows].map((line) => line.map(escapeCsvCell).join(',')).join('\n'));
+  }
+
+  async function handleCopyMonteCarloPayload() {
+    try {
+      await copyTextToClipboard(JSON.stringify(monteCarloPayload, null, 2));
+      setFeedback({ tone: 'success', message: '분석 입력 JSON을 복사했습니다.' });
+    } catch {
+      setFeedback({ tone: 'warning', message: 'JSON 파일로 저장해 주세요.' });
+    }
+  }
+
+  function handleDownloadMonteCarloPayload() {
+    downloadTextFile((selectedDetailProduct?.smartStoreProductId ?? 'product') + '-monte-carlo.json', JSON.stringify(monteCarloPayload, null, 2));
+    setFeedback({ tone: 'success', message: '분석 입력 JSON을 저장했습니다.' });
+  }
+
+  async function handleRunProjection() {
+    if (!selectedDetailProduct) {
+      return;
+    }
+
+    try {
+      setRunningDecisionProjection(true);
+      setFeedback({ tone: 'info', message: '분석 요청을 준비하고 있습니다.' });
+      const result = await onRunDecisionProjection(selectedDetailProduct.id, {
+        seoTitle: detailForm.seoOptimizedTitle.trim(),
+        primaryKeyword: detailForm.primaryKeyword.trim(),
+        trackingKeywords: detailForm.trackingKeywords.split(',').map((item) => item.trim()).filter(Boolean),
+        targetRank: 20,
+        iterations: 30000,
+        seed: 42871,
+        horizonDays: 30
+      });
+      setDecisionProjection(result);
+      setFeedback({ tone: 'success', message: '결과를 불러왔습니다.' });
+    } catch (error) {
+      setDecisionProjection(null);
+      setFeedback({ tone: 'warning', message: error instanceof Error ? error.message : '결과를 불러오지 못했습니다.' });
+    } finally {
+      setRunningDecisionProjection(false);
+    }
+  }
+
   return (
-    <section className="panel">
-      <div className="section-heading">
+    <section className="dashboard report-layout">
+      <div className="panel report-hero">
         <div>
-          <p className="eyebrow">카탈로그</p>
-          <h2>상품 목록</h2>
+          <p className="eyebrow">{'\uC0C1\uD488 \uBAA9\uB85D'}</p>
+          <h2>{'\uB124\uC774\uBC84\uC1FC\uD551 \uC0C1\uD488\uBA85 SEO \uAC80\uC99D \uCD94\uC801\uAE30'}</h2>
+          <p>{'\uC0C1\uD488\uBA85 \uBCC0\uACBD \uC804\uD6C4 \uC2E4\uD5D8\uC744 \uD55C \uD654\uBA74\uC5D0\uC11C \uCD94\uC801\uD558\uB294 \uC6B4\uC601\uD615 \uCF58\uC194\uC785\uB2C8\uB2E4.'}</p>
+        </div>
+        <div>
+          <div className="inline-actions">
+            <button type="button" className="action-button secondary" onClick={handleExportProductsCsv}>{'\uC0C1\uD488 \uBAA9\uB85D CSV'}</button>
+            <button type="button" className="action-button" onClick={() => void handleImportClick()} disabled={importing || activeCommerceAccounts.length === 0}>
+              {importing ? '\uB370\uC774\uD130\uB97C \uBD88\uB7EC\uC624\uB294 \uC911\uC785\uB2C8\uB2E4.' : '\uC2A4\uB9C8\uD2B8\uC2A4\uD1A0\uC5B4 \uC0C1\uD488 \uBD88\uB7EC\uC624\uAE30'}
+            </button>
+          </div>
+          <div className="report-summary-chips">
+            {heroImportChips.map((chip) => <span key={chip} className="filter-summary">{chip}</span>)}
+          </div>
         </div>
       </div>
-      <DataGrid
-        columns={[
-          { key: "smartStoreProductId", title: "스마트스토어 상품 ID", width: 200, sticky: true },
-          { key: "sellerManagementCode", title: "판매자관리코드", width: 160 },
-          { key: "currentTitle", title: "현재 상품명", width: 300 },
-          { key: "seoOptimizedTitle", title: "SEO 상품명", width: 320 },
-          { key: "primaryKeyword", title: "대표 키워드", width: 150 },
-          {
-            key: "trackingKeywords",
-            title: "추적 키워드",
-            width: 240,
-            render: (row) => row.trackingKeywords.join(", ")
-          },
-          { key: "price", title: "판매가", width: 120 },
-          {
-            key: "testStatus",
-            title: "테스트 상태",
-            width: 130,
-            render: (row) => <StatusBadge value={row.testStatus} />
-          }
-        ]}
-        rows={products}
-      />
+
+
+      <section className="panel report-filter-panel">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">{'\uC785\uB825 \uCCB4\uD06C\uB9AC\uC2A4\uD2B8'}</p>
+            <h3>{'\uC9C0\uAE08 \uD544\uC694\uD55C \uD56D\uBAA9'}</h3>
+          </div>
+          <div className="report-summary-chips">
+            <span className="filter-summary">{'\uC804\uCCB4 \uC0C1\uD488 ' + products.length + '\uAC1C'}</span>
+            <span className="filter-summary">{'\uD604\uC7AC \uD544\uD130 \uACB0\uACFC ' + filteredProducts.length + '\uAC1C'}</span>
+            <span className="filter-summary">{'SEO \uC785\uB825 \uC644\uB8CC ' + visibleSeoReadyCount + '\uAC1C'}</span>
+            <span className="filter-summary">{'SEO \uBBF8\uC785\uB825 ' + visibleSeoPendingCount + '\uAC1C'}</span>
+            <span className="filter-summary">{'\uC2E4\uD5D8 \uCD08\uC548 ' + experiments.length + '\uAC1C'}</span>
+          </div>
+        </div>
+        <div className="report-filters product-filter-grid">
+          <label>
+            <span>{'\uACC4\uC815'}</span>
+            <select value={selectedImportAccountId} onChange={(event) => setSelectedImportAccountId(event.target.value)}>
+              <option value="">{'\uACC4\uC815\uC744 \uC120\uD0DD\uD558\uC138\uC694'}</option>
+              {activeCommerceAccounts.map((account) => (
+                <option key={account.id} value={account.id}>{account.name}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>{'\uC0C1\uD488 \uAC80\uC0C9'}</span>
+            <input value={productSearchQuery} onChange={(event) => setProductSearchQuery(event.target.value)} placeholder={'\uC0C1\uD488\uBA85, SEO \uC0C1\uD488\uBA85, ID\uB97C \uAC80\uC0C9\uD558\uC138\uC694'} />
+          </label>
+          <label>
+            <span>{'\uC0C1\uD0DC'}</span>
+            <select value={productStatusFilter} onChange={(event) => setProductStatusFilter(event.target.value as 'ALL' | Product['testStatus'])}>
+              <option value="ALL">{'\uC804\uCCB4'}</option>
+              <option value="DRAFT">{'\uCD08\uC548'}</option>
+              <option value="RUNNING">{'\uC9C4\uD589 \uC911'}</option>
+              <option value="PAUSED">{'\uC77C\uC2DC \uC911\uC9C0'}</option>
+              <option value="COMPLETED">{'\uC644\uB8CC'}</option>
+              <option value="FAILED">{'\uC2E4\uD328'}</option>
+            </select>
+          </label>
+          <label>
+            <span>{'\uCE74\uD14C\uACE0\uB9AC'}</span>
+            <select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}>
+              <option value="ALL">{'\uC804\uCCB4'}</option>
+              {categoryOptions.map((category) => (
+                <option key={category} value={category}>{category}</option>
+              ))}
+            </select>
+          </label>
+          <label className="checkbox-field">
+            <span>{'SEO \uC785\uB825 \uC644\uB8CC\uB9CC \uBCF4\uAE30'}</span>
+            <input type="checkbox" checked={seoReadyOnly} onChange={(event) => setSeoReadyOnly(event.target.checked)} />
+          </label>
+        </div>
+        <div className="inline-actions product-filter-actions">
+          <button type="button" className="action-button secondary" onClick={handleStartSeoPendingReview}>
+            {'SEO \uBBF8\uC785\uB825 \uAC80\uD1A0 \uC2DC\uC791'}
+          </button>
+          <button type="button" className="action-button secondary" onClick={handleResetProductFilters} disabled={!hasActiveProductFilters}>
+            {'\uD544\uD130 \uCD08\uAE30\uD654'}
+          </button>
+          <span className="helper-copy product-filter-helper">{seoPendingProducts.length > 0 ? '\uC544\uC9C1 SEO \uBBF8\uC785\uB825 \uC0C1\uD488 ' + seoPendingProducts.length + '\uAC1C\uAC00 \uB0A8\uC544 \uC788\uC2B5\uB2C8\uB2E4.' : '\uBAA8\uB4E0 \uD544\uD130 \uB300\uC0C1 \uC0C1\uD488\uC5D0 SEO \uC785\uB825\uC774 \uC788\uC2B5\uB2C8\uB2E4.'}</span>
+        </div>
+        {lastImportResult ? <div className={'feedback-banner success'}>{lastImportResult.accountName + ' \uACC4\uC815 \uB3D9\uAE30\uD654 \uC644\uB8CC: \uC2A4\uD1A0\uC5B4 ' + lastImportResult.sellerIdentifier + ' / \uC870\uD68C ' + lastImportResult.totalFetched + '\uAC1C / \uBC18\uC601 ' + lastImportResult.importedCount + '\uAC1C / \uC2E0\uADDC ' + lastImportResult.createdCount + '\uAC1C / \uC5C5\uB370\uC774\uD2B8 ' + lastImportResult.updatedCount + '\uAC1C / \uC81C\uC678 ' + lastImportResult.skippedCount + '\uAC1C'}</div> : null}
+        <div className="card-grid">
+          {syncSummaryItems.map((item) => (
+            <article key={item.label} className="metric-card panel tone-card compact-card">
+              <span>{item.label}</span>
+              <strong>{item.value}</strong>
+              <small>{item.caption}</small>
+            </article>
+          ))}
+        </div>
+        {feedback ? <div className={'feedback-banner ' + feedback.tone}>{feedback.message}</div> : null}
+      </section>
+
+      <section className="panel">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">상품 테이블</p>
+            <h2>상품 목록</h2>
+          </div>
+        </div>
+        <DataGrid
+          columns={[
+            { key: 'smartStoreProductId', title: 'ID', width: 160, sticky: true },
+            { key: 'currentTitle', title: '현재 상품명', width: 300 },
+            { key: 'seoOptimizedTitle', title: 'SEO 상품명', width: 320 },
+            { key: 'primaryKeyword', title: '키워드', width: 160 },
+            { key: 'trackingKeywords', title: '추적 키워드', width: 220, render: (row) => row.trackingKeywords.join(', ') },
+            { key: 'price', title: '가격', width: 110 },
+            { key: 'testStatus', title: '상태', width: 120, render: (row) => <StatusBadge value={row.testStatus} /> },
+            {
+              key: 'actions',
+              title: '상세',
+              width: 120,
+              render: (row) => (
+                <button type="button" className="action-button secondary" onClick={() => setSelectedDetailProductId(row.id)}>
+                  상세 보기
+                </button>
+              )
+            }
+          ]}
+          rows={filteredProducts}
+        />
+      </section>
+
+      {selectedDetailProduct ? (
+        <section className="panel product-detail-panel">
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow">{'\uC0C1\uD488 \uC0C1\uC138'}</p>
+              <h2>{selectedDetailProduct.currentTitle}</h2>
+              <p className="helper-copy">{'\uC0C1\uD488\uBA85\uACFC SEO \uC785\uB825\uAC12\uC744 \uBE44\uAD50\uD558\uACE0 \uB2E4\uC74C \uC2E4\uD5D8 \uCD08\uC548\uC744 \uBE60\uB974\uAC8C \uC900\uBE44\uD569\uB2C8\uB2E4.'}</p>
+            </div>
+            <div className="inline-actions">
+              <span className="filter-summary">{detailProgressLabel}</span>
+              <button type="button" className="action-button secondary" onClick={() => handleSelectDetailProduct(previousDetailProduct?.id ?? null)} disabled={!previousDetailProduct || savingProductDetail}>
+                {'\uC774\uC804 \uC0C1\uD488'}
+              </button>
+              <button type="button" className="action-button secondary" onClick={() => handleSelectDetailProduct(nextDetailProduct?.id ?? null)} disabled={!nextDetailProduct || savingProductDetail}>
+                {'\uB2E4\uC74C \uC0C1\uD488'}
+              </button>
+              <button type="button" className="action-button secondary" onClick={() => void handleSaveProductDetail(nextDetailProduct?.id ?? null)} disabled={savingProductDetail || !nextDetailProduct}>
+                {savingProductDetail ? '\uC800\uC7A5 \uC911...' : '\uC800\uC7A5 \uD6C4 \uB2E4\uC74C \uC0C1\uD488'}
+              </button>
+              <button type="button" className="action-button secondary" onClick={() => void handleCreateDraft(selectedDetailProduct, null, true)} disabled={creatingExperimentId === selectedDetailProduct.id || !detailForm.seoOptimizedTitle.trim() || savingProductDetail}>
+                {creatingExperimentId === selectedDetailProduct.id ? "\uC0DD\uC131 \uC911..." : "\uCD08\uC548 \uD6C4 \uC2E4\uD5D8 \uD654\uBA74"}
+              </button>
+              <button type="button" className="action-button secondary" onClick={() => void handleSaveProductDetail(nextSeoPendingProduct?.id ?? null)} disabled={savingProductDetail || !nextSeoPendingProduct}>
+                {savingProductDetail ? '\uC800\uC7A5 \uC911...' : '\uC800\uC7A5 \uD6C4 \uB2E4\uC74C SEO \uBBF8\uC785\uB825 \uC0C1\uD488'}
+              </button>
+              <button type="button" className="action-button secondary" onClick={() => void handleCreateDraft(selectedDetailProduct, nextSeoPendingProduct?.id ?? null)} disabled={creatingExperimentId === selectedDetailProduct.id || !detailForm.seoOptimizedTitle.trim() || savingProductDetail || !nextSeoPendingProduct}>
+                {creatingExperimentId === selectedDetailProduct.id ? '\uC0DD\uC131 \uC911...' : '\uCD08\uC548 \uD6C4 \uB2E4\uC74C SEO \uBBF8\uC785\uB825 \uC0C1\uD488'}
+              </button>
+              <button type="button" className="action-button secondary" onClick={() => void handleCreateDraft(selectedDetailProduct)} disabled={creatingExperimentId === selectedDetailProduct.id || !detailForm.seoOptimizedTitle.trim() || savingProductDetail}>
+                {creatingExperimentId === selectedDetailProduct.id ? '\uC0DD\uC131 \uC911...' : '\uC2E4\uD5D8 \uCD08\uC548 \uB9CC\uB4E4\uAE30'}
+              </button>
+              <button type="button" className="action-button" onClick={() => void handleSaveProductDetail()} disabled={savingProductDetail}>
+                {savingProductDetail ? '\uC800\uC7A5 \uC911...' : '\uC0C1\uD488 SEO \uC800\uC7A5'}
+              </button>
+            </div>
+          </div>
+
+          <div className="product-detail-grid">
+            <article className="product-detail-item">
+              <span>{'\uD604\uC7AC \uC0C1\uD488\uBA85'}</span>
+              <input value={selectedDetailProduct.currentTitle} disabled />
+            </article>
+            <article className="product-detail-item">
+              <span>{'대표 키워드'}</span>
+              <input value={detailForm.primaryKeyword} onChange={(event) => setDetailForm((current) => ({ ...current, primaryKeyword: event.target.value }))} placeholder={'대표 키워드 입력'} />
+            </article>
+            <article className="product-detail-item product-detail-wide">
+              <span>{'SEO 상품명'}</span>
+              <textarea value={detailForm.seoOptimizedTitle} onChange={(event) => setDetailForm((current) => ({ ...current, seoOptimizedTitle: event.target.value }))} placeholder={'SEO 상품명 입력'} />
+            </article>
+            <article className="product-detail-item product-detail-wide">
+              <span>{'추적 키워드'}</span>
+              <textarea value={detailForm.trackingKeywords} onChange={(event) => setDetailForm((current) => ({ ...current, trackingKeywords: event.target.value }))} placeholder={'추적 키워드 입력'} />
+            </article>
+          </div>
+
+          <div className="product-comparison-grid">
+            <section className="product-history-card">
+              <div className="section-heading">
+                <div>
+                  <p className="eyebrow">{'제목 비교'}</p>
+                  <h3>{'변경 전 / 변경 후'}</h3>
+                </div>
+              </div>
+              <div className="title-compare-card">
+                <div>
+                  <span className="compare-label">{'현재 상품명'}</span>
+                  <p>{selectedDetailProduct.currentTitle}</p>
+                </div>
+                <div>
+                  <span className="compare-label">{'SEO 상품명'}</span>
+                  <p>{detailForm.seoOptimizedTitle || '입력된 SEO 상품명이 없습니다.'}</p>
+                </div>
+              </div>
+              <div className="compare-chip-row">
+                {titleComparison.added.length > 0 ? titleComparison.added.map((item) => <span key={'add-' + item} className='compare-chip added'>+ {item}</span>) : <span className='compare-chip neutral'>{'추가 키워드 없음'}</span>}
+                {titleComparison.removed.length > 0 ? titleComparison.removed.map((item) => <span key={'remove-' + item} className='compare-chip removed'>- {item}</span>) : <span className='compare-chip neutral'>{'제거 키워드 없음'}</span>}
+              </div>
+            </section>
+            <section className="product-history-card">
+              <div className="section-heading">
+                <div>
+                  <p className="eyebrow">{'키워드 미리보기'}</p>
+                  <h3>{'분석에 사용할 키워드'}</h3>
+                </div>
+              </div>
+              <div className="compare-chip-row">
+                {keywordPreviewItems.length > 0 ? keywordPreviewItems.map((item) => <span key={item} className='compare-chip keyword'>{item}</span>) : <span className='compare-chip neutral'>{'입력된 키워드가 없습니다.'}</span>}
+              </div>
+            </section>
+          </div>
+
+          <div className="product-history-grid">
+            <section className="product-history-card">
+              <div className="section-heading">
+                <div>
+                  <p className="eyebrow">{'준비 상태'}</p>
+                  <h3>{'분석 입력 초안'}</h3>
+                </div>
+              </div>
+              <div className="history-list">
+                <article className="history-item"><strong>{'준비 상태'}</strong><span>{monteCarloDraft.readinessLabel}</span></article>
+                <article className='history-item'><strong>{'입력 요약'}</strong><span>{'제목 길이 차이 ' + monteCarloDraft.titleLengthDelta + ' / 추적 키워드 ' + monteCarloDraft.trackingKeywordCount + ' / 관련 실험 ' + relatedExperiments.length}</span></article>
+                <article className="history-item"><strong>{'요약 메모'}</strong><span>{monteCarloDraft.summary}</span></article>
+              </div>
+              <div className="recommendation-card">
+                <div className="recommendation-header">
+                  <div>
+                    <span className="compare-label">{'요약'}</span>
+                    <strong>{monteCarloRecommendation.actionLabel}</strong>
+                  </div>
+                  <span className={'recommendation-badge ' + monteCarloRecommendation.tone}>{monteCarloRecommendation.confidenceLabel}</span>
+                </div>
+                <p className="recommendation-summary">{monteCarloRecommendation.summary}</p>
+                <div className="recommendation-columns">
+                  <div>
+                    <span className="compare-label">{'근거'}</span>
+                    <ul className="recommendation-list">{monteCarloRecommendation.reasons.map((reason) => <li key={reason}>{reason}</li>)}</ul>
+                  </div>
+                  <div>
+                    <span className="compare-label">{'주의'}</span>
+                    <ul className="recommendation-list">{monteCarloRecommendation.risks.map((risk) => <li key={risk}>{risk}</li>)}</ul>
+                  </div>
+                </div>
+              </div>
+              <div className="inline-actions">
+                <button type="button" className="action-button" onClick={() => void handleRunProjection()} disabled={runningDecisionProjection}>
+                  {runningDecisionProjection ? '분석 중...' : '분석 실행'}
+                </button>
+                <button type="button" className="action-button secondary" onClick={() => void handleCopyMonteCarloPayload()}>{'JSON 복사'}</button>
+                <button type="button" className="action-button secondary" onClick={handleDownloadMonteCarloPayload}>{'JSON 저장'}</button>
+              </div>
+            </section>
+
+            <section className="product-history-card">
+              <div className="section-heading">
+                <div>
+                  <p className="eyebrow">{'변경 이력'}</p>
+                  <h3>{'최근 제목 변경 로그'}</h3>
+                </div>
+              </div>
+              {relatedTitleChangeLogs.length === 0 ? <p className="helper-copy">{'아직 제목 변경 로그가 없습니다.'}</p> : <div className="history-list">{relatedTitleChangeLogs.map((log) => <article key={log.id} className="history-item"><div className="import-log-meta"><StatusBadge value={log.result} /><span>{formatDateTime(log.updatedAt)}</span></div><strong>{log.beforeTitle}</strong><span>{log.afterTitle}</span></article>)}</div>}
+            </section>
+
+            <section className="product-history-card">
+              <div className="section-heading">
+                <div>
+                  <p className="eyebrow">{'실험'}</p>
+                  <h3>{'실험 관리'}</h3>
+                </div>
+              </div>
+              {relatedExperiments.length === 0 ? <p className="helper-copy">{'관련 실험 기록이 없습니다.'}</p> : <div className="history-list">{relatedExperiments.map((experiment) => <article key={experiment.id} className="history-item"><div className="import-log-meta"><StatusBadge value={experiment.status} /><StatusBadge value={experiment.judgement} /></div><strong>{experiment.name}</strong><span>{experiment.afterTitle}</span></article>)}</div>}
+            </section>
+
+            <section className="product-history-card">
+              <div className="section-heading">
+                <div>
+                  <p className="eyebrow">{'분석 결과'}</p>
+                  <h3>{'Claude 정량 분석'}</h3>
+                </div>
+              </div>
+              {decisionProjection ? (
+                <div className="history-list">
+                  <article className="history-item"><strong>{'신뢰도'}</strong><span>{formatDecisionConfidence(decisionProjection.projection.confidence) + ' / 권장 ' + formatDecisionRecommendationStatus(decisionProjection.projection.recommendation.status)}</span></article>
+                  <article className="history-item"><strong>{'CTR 상승 확률'}</strong><span>{formatPercent(decisionProjection.projection.results.probabilityPositiveCtrLift) + ' / 중앙값 ' + formatPercent(decisionProjection.projection.results.expectedCtrLift.median) + ' / P10 ' + formatPercent(decisionProjection.projection.results.expectedCtrLift.p10) + ' / P90 ' + formatPercent(decisionProjection.projection.results.expectedCtrLift.p90)}</span></article>
+                  <article className='history-item'><strong>{'목표 순위 도달 확률'}</strong><span>{decisionProjection.projection.results.probabilityTargetRank === null ? '목표 순위 정보가 없어 계산하지 못했습니다.' : formatPercent(decisionProjection.projection.results.probabilityTargetRank)}</span></article>
+                  <article className='history-item'><strong>{'예상 주문 범위'}</strong><span>{'중앙값 ' + formatNumber(decisionProjection.projection.results.expectedOrders.median) + ' / P10 ' + formatNumber(decisionProjection.projection.results.expectedOrders.p10) + ' / P90 ' + formatNumber(decisionProjection.projection.results.expectedOrders.p90)}</span></article>
+                  <article className='history-item'><strong>{'입력 개요'}</strong><span>{'키워드 ' + decisionProjection.inputSummary.keyword + ' / 제목 점수 ' + decisionProjection.inputSummary.titleScoreBefore + ' → ' + decisionProjection.inputSummary.titleScoreAfter + ' / 순위 이력 ' + decisionProjection.inputSummary.rankHistoryCount}</span></article>
+                </div>
+              ) : (
+                <div className="history-list">
+                  <article className="history-item"><strong>{'권장 조치'}</strong><span>{'SEO 상품명과 추적 키워드를 정리한 뒤 분석을 실행해 주세요.'}</span></article>
+                  <article className="history-item"><strong>{'필수 입력'}</strong><span>{'CTR 기준, 목표 순위, 추적 키워드, 제목 점수'}</span></article>
+                  <article className="history-item"><strong>{'주의 사항'}</strong><span>{'입력값이 부족하면 결과 해석 신뢰도가 낮아질 수 있습니다.'}</span></article>
+                </div>
+              )}
+              {decisionProjection && decisionProjection.projection.warnings.length > 0 ? <div className="feedback-banner warning">{decisionProjection.projection.warnings.join(' / ')}</div> : null}
+            </section>
+          </div>
+
+          {recentImportLogRows.length > 0 ? (
+            <section className="panel import-log-card">
+              <div className="section-heading">
+                <div>
+                  <p className="eyebrow">{'동기화 로그'}</p>
+                  <h3>{'최근 상품 동기화 로그'}</h3>
+                </div>
+              </div>
+              <div className="import-log-list">
+                {recentImportLogRows.map((log) => <article key={log.id} className="import-log-item"><div className="import-log-meta"><StatusBadge value={log.level} /><span>{formatDateTime(log.createdAt)}</span></div><strong>{log.message}</strong><span>{log.detailSummary}</span></article>)}
+              </div>
+            </section>
+          ) : null}
+        </section>
+      ) : null}
     </section>
   );
 }
 
-function ExperimentsView({ experiments }: { experiments: SeoExperiment[] }) {
+function buildTitleComparison(currentTitle: string, seoTitle: string) {
+  const currentTokens = new Set(currentTitle.split(/\s+/).map((item) => item.trim()).filter(Boolean));
+  const seoTokens = new Set(seoTitle.split(/\s+/).map((item) => item.trim()).filter(Boolean));
+  return { added: Array.from(seoTokens).filter((item) => !currentTokens.has(item)), removed: Array.from(currentTokens).filter((item) => !seoTokens.has(item)) };
+}
+
+function buildKeywordPreview(primaryKeyword: string, trackingKeywords: string) {
+  return Array.from(new Set([primaryKeyword, ...trackingKeywords.split(',')].map((item) => item.trim()).filter(Boolean)));
+}
+
+function buildMonteCarloDraft(input: { product: Product | null; seoTitle: string; primaryKeyword: string; trackingKeywords: string[]; experimentCount: number; titleChangeCount: number; }) {
+  const currentTitle = input.product?.currentTitle ?? '';
+  const seoTitle = input.seoTitle.trim();
+  const titleLengthDelta = seoTitle.length - currentTitle.length;
+  const trackingKeywordCount = input.trackingKeywords.length;
+  const readinessScore = [seoTitle.length > 0, input.primaryKeyword.trim().length > 0, trackingKeywordCount > 0].filter(Boolean).length;
+  const readinessLabel = readinessScore === 3 ? '분석 준비 완료' : readinessScore === 2 ? '거의 준비됨' : '입력 필요 항목 있음';
+  const summary = readinessScore === 3
+    ? '현재 입력으로 분석 실행이 가능한 상태입니다.'
+    : readinessScore === 2
+      ? '핵심 정보는 대부분 준비됐지만 몇 가지 보완이 필요합니다.'
+      : 'SEO 상품명, 대표 키워드, 추적 키워드를 먼저 채워 주세요.';
+  return { readinessLabel, titleLengthDelta, trackingKeywordCount, experimentCount: input.experimentCount, titleChangeCount: input.titleChangeCount, summary, readinessScore, hasSeoTitle: seoTitle.length > 0, hasPrimaryKeyword: input.primaryKeyword.trim().length > 0 };
+}
+
+function buildMonteCarloRecommendation(input: ReturnType<typeof buildMonteCarloDraft>) {
+  const reasons: string[] = [];
+  const risks: string[] = [];
+
+  if (input.hasSeoTitle) reasons.push('SEO 상품명이 있어 비교 기준이 분명합니다.');
+  else risks.push('SEO 상품명이 없어 비교 기준이 부족합니다.');
+
+  if (input.hasPrimaryKeyword) reasons.push('대표 키워드가 있어 검색 시나리오 정렬이 가능합니다.');
+  else risks.push('대표 키워드가 없어 분석 기준이 흐리며질 수 있습니다.');
+
+  if (input.trackingKeywordCount >= 3) reasons.push('추적 키워드가 충분해 분포 비교가 가능합니다.');
+  else if (input.trackingKeywordCount > 0) {
+    reasons.push('추적 키워드로 기본 비교는 가능합니다.');
+    risks.push('추적 키워드 수가 적어 변동성 해석에 제한이 있습니다.');
+  } else risks.push('추적 키워드가 없어 실험 비교가 어려워집니다.');
+
+  if (input.titleChangeCount > 0) reasons.push('제목 변경 이력이 있어 prior 비교에 참고할 수 있습니다.');
+  if (input.experimentCount > 0) reasons.push('관련 실험이 있어 결과 비교가 가능합니다.');
+  else risks.push('관련 실험 이력이 없어 초기 해석 기준이 부족합니다.');
+
+  let actionLabel = '입력 보완 필요';
+  let confidenceLabel = '낮음';
+  let tone = 'warning';
+  let summary = '필수 입력값이 아직 부족해 데이터 보완이 우선입니다.';
+
+  if (input.readinessScore === 3 && input.trackingKeywordCount >= 2) {
+    actionLabel = '분석 진행 권장';
+    confidenceLabel = '높음';
+    tone = 'success';
+    summary = '입력 품질이 좋아 바로 분석을 실행할 수 있습니다.';
+  } else if (input.readinessScore >= 2) {
+    actionLabel = '보완 후 분석 권장';
+    confidenceLabel = '보통';
+    tone = 'neutral';
+    summary = '일부 입력은 준비됐지만 몇 가지 보완이 필요합니다.';
+  }
+
+  return { actionLabel, confidenceLabel, tone, summary, reasons, risks: risks.length > 0 ? risks : ['추가 위험 요소는 없지만 변동성은 계속 관찰해야 합니다.'] };
+}
+
+function buildMonteCarloPayload(input: { product: Product | null; seoTitle: string; primaryKeyword: string; trackingKeywords: string[]; recommendation: ReturnType<typeof buildMonteCarloRecommendation>; experimentCount: number; titleChangeCount: number; }) {
+  return { generatedAt: new Date().toISOString(), source: 'naver-name-seo-tracker', product: { id: input.product?.id ?? '', smartStoreProductId: input.product?.smartStoreProductId ?? '', currentTitle: input.product?.currentTitle ?? '', category: input.product?.category ?? '', price: input.product?.price ?? 0 }, seoInput: { seoTitle: input.seoTitle.trim(), primaryKeyword: input.primaryKeyword.trim(), trackingKeywords: input.trackingKeywords }, historySummary: { experimentCount: input.experimentCount, titleChangeCount: input.titleChangeCount }, recommendation: { action: input.recommendation.actionLabel, confidence: input.recommendation.confidenceLabel, summary: input.recommendation.summary, reasons: input.recommendation.reasons, risks: input.recommendation.risks } };
+}
+
+function formatPercent(value: number) {
+  return (value * 100).toFixed(1) + '%';
+}
+
+function formatNumber(value: number) {
+  return value.toFixed(2);
+}
+
+function formatDecisionRecommendationStatus(value: DecisionProjectionResponse['projection']['recommendation']['status']) {
+  if (value === 'adopt_candidate') return '적용 후보';
+  if (value === 'keep_baseline') return '기존안 유지';
+  return '추가 확인';
+}
+
+function formatDecisionConfidence(value: DecisionProjectionResponse['projection']['confidence']) {
+  if (value === 'high') return '??';
+  if (value === 'medium') return '??';
+  return '??';
+}
+
+function ExperimentsView({ experiments, focusExperimentId }: { experiments: SeoExperiment[]; focusExperimentId?: string | null }) {
+  const [experimentViewMode, setExperimentViewMode] = useState<'ALL' | 'DRAFT_ONLY' | 'FOCUS_ONLY'>(focusExperimentId ? 'FOCUS_ONLY' : 'ALL');
+  const sortedExperiments = [...experiments].sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime());
+  const focusExperiment = (focusExperimentId ? sortedExperiments.find((experiment) => experiment.id === focusExperimentId) : null) ?? sortedExperiments[0] ?? null;
+  const draftCount = sortedExperiments.filter((experiment) => experiment.status === 'DRAFT').length;
+  const runningCount = sortedExperiments.filter((experiment) => experiment.status === 'RUNNING').length;
+
+  useEffect(() => {
+    if (focusExperimentId) {
+      setExperimentViewMode('FOCUS_ONLY');
+    }
+  }, [focusExperimentId]);
+
+  const filteredExperiments = sortedExperiments.filter((experiment) => {
+    if (experimentViewMode === 'DRAFT_ONLY') return experiment.status === 'DRAFT';
+    if (experimentViewMode === 'FOCUS_ONLY') return focusExperimentId ? experiment.id === focusExperimentId : true;
+    return true;
+  });
+
   return (
     <section className="panel">
       <div className="section-heading">
         <div>
-          <p className="eyebrow">실험 단위</p>
-          <h2>SEO 테스트 관리</h2>
+          <p className="eyebrow">{'\uC2E4\uD5D8 \uB2E8\uC704'}</p>
+          <h2>{'SEO \uD14C\uC2A4\uD2B8 \uAD00\uB9AC'}</h2>
+          <p className="helper-copy">{'\uCD5C\uC2E0 \uCD08\uC548\uBD80\uD130 \uD655\uC778\uD560 \uC218 \uC788\uB3C4\uB85D \uCD5C\uADFC \uC0DD\uC131 \uC21C\uC11C\uB85C \uC815\uB82C\uD588\uC2B5\uB2C8\uB2E4.'}</p>
         </div>
       </div>
+      {focusExperiment ? (
+        <div className="type-guide-card experiment-focus-card">
+          <div className="report-summary-chips">
+            <span className="filter-summary">{'\uC804\uCCB4 \uC2E4\uD5D8 ' + sortedExperiments.length + '\uAC1C'}</span>
+            <span className="filter-summary">{'\uCD08\uC548 ' + draftCount + '\uAC1C'}</span>
+            <span className="filter-summary">{'\uC9C4\uD589 \uC911 ' + runningCount + '\uAC1C'}</span>
+            <span className="filter-summary">{focusExperimentId ? '\uBC29\uAE08 \uB9CC\uB4E0 \uCD08\uC548' : '\uAC00\uC7A5 \uCD5C\uADFC \uC2E4\uD5D8'}</span>
+          </div>
+          <strong>{focusExperiment.name}</strong>
+          <p>{focusExperiment.afterTitle}</p>
+          <p className="helper-copy">{'\uC0C1\uD0DC ' + focusExperiment.status + ' / \uD310\uB2E8 ' + focusExperiment.judgement + ' / \uC2DC\uC791 ' + formatDateTime(focusExperiment.startDate)}</p>
+          <div className="inline-actions experiment-filter-actions">
+            <button type="button" className={experimentViewMode === 'FOCUS_ONLY' ? 'action-button' : 'action-button secondary'} onClick={() => setExperimentViewMode('FOCUS_ONLY')} disabled={!focusExperimentId}>{'\uBC29\uAE08 \uB9CC\uB4E0 \uCD08\uC548\uB9CC \uBCF4\uAE30'}</button>
+            <button type="button" className={experimentViewMode === 'DRAFT_ONLY' ? 'action-button' : 'action-button secondary'} onClick={() => setExperimentViewMode('DRAFT_ONLY')}>{'\uCD08\uC548\uB9CC \uBCF4\uAE30'}</button>
+            <button type="button" className={experimentViewMode === 'ALL' ? 'action-button' : 'action-button secondary'} onClick={() => setExperimentViewMode('ALL')}>{'\uC804\uCCB4 \uBCF4\uAE30'}</button>
+          </div>
+        </div>
+      ) : null}
       <DataGrid
         columns={[
-          { key: "name", title: "테스트명", width: 220, sticky: true },
-          { key: "beforeTitle", title: "변경 전", width: 240 },
-          { key: "afterTitle", title: "변경 후", width: 280 },
-          { key: "trackingInterval", title: "주기", width: 120 },
+          { key: "name", title: "????", width: 220, sticky: true },
+          { key: "beforeTitle", title: "?? ?", width: 240 },
+          { key: "afterTitle", title: "?? ?", width: 280 },
+          { key: "trackingInterval", title: "??", width: 120 },
           {
             key: "status",
-            title: "상태",
+            title: "??",
             width: 120,
             render: (row) => <StatusBadge value={row.status} />
           },
           {
             key: "judgement",
-            title: "판단",
+            title: "??",
             width: 120,
             render: (row) => <StatusBadge value={row.judgement} />
           },
-          { key: "summary", title: "요약", width: 240 }
+          { key: "summary", title: "??", width: 240, render: (row) => row.id === focusExperimentId ? "?? ?? ??" : (row.summary ?? "-") }
         ]}
-        rows={experiments}
+        rows={filteredExperiments}
       />
     </section>
   );
@@ -861,13 +1776,13 @@ function TrackingJobsView({
       <div className="section-heading">
         <div>
           <p className="eyebrow">스케줄러</p>
-          <h2>랭킹 추적 Job</h2>
+          <h2>랭킹 추적 작업</h2>
         </div>
       </div>
       <DataGrid
         columns={[
           { key: "keyword", title: "키워드", width: 180, sticky: true },
-          { key: "provider", title: "Provider", width: 140 },
+          { key: "provider", title: "제공처", width: 140 },
           { key: "interval", title: "주기", width: 120 },
           {
             key: "status",
@@ -1933,11 +2848,11 @@ function buildFieldHints(type: ApiAccountFormInput["type"]): FieldHintMap {
     },
     accessLicense: {
       placeholder: type === "SEARCH_AD" ? "검색광고 액세스 라이선스" : "커머스 액세스 라이선스",
-      helper: type === "SEARCH_AD" ? "검색광고 실연동 테스트에 필요합니다." : "커머스 검증 및 향후 실연동 호출에 필요합니다."
+      helper: type === "SEARCH_AD" ? "검색광고 실연동 테스트에 필요합니다." : "커머스 유형에서는 사용하지 않습니다."
     },
     secretKey: {
       placeholder: type === "SEARCH_AD" ? "검색광고 시크릿 키" : "커머스 시크릿 키",
-      helper: type === "SEARCH_AD" ? "검색광고 실연동 요청 서명에 사용됩니다." : "커머스 검증 및 향후 실연동 호출에 필요합니다."
+      helper: type === "SEARCH_AD" ? "검색광고 실연동 요청 서명에 사용됩니다." : "커머스 유형에서는 사용하지 않습니다."
     },
     customerId: {
       placeholder: "검색광고 고객 ID",
@@ -1945,11 +2860,11 @@ function buildFieldHints(type: ApiAccountFormInput["type"]): FieldHintMap {
     },
     storeId: {
       placeholder: "커머스 스토어 ID",
-      helper: "스토어 기반 커머스 연동이면 이 값을 사용하세요."
+      helper: "스토어 기반 연동이면 이 값을 사용하세요. 채널 ID가 없으면 이것만 입력해도 됩니다."
     },
     channelId: {
       placeholder: "커머스 채널 ID",
-      helper: "채널 기반 커머스 연동이면 이 값을 사용하세요."
+      helper: "채널 기반 연동이면 이 값을 사용하세요. 스토어 ID가 없으면 이것만 입력해도 됩니다."
     }
   };
 }
@@ -1959,22 +2874,22 @@ function buildNextActionGuide(accounts: ApiAccount[], formReadiness: FormReadine
 
   if (liveReadyAccounts.length > 0) {
     return {
-      title: "검색광고 실연동 테스트를 실행하세요.",
-      description: `저장된 계정 중 ${liveReadyAccounts.length}개는 실제 외부 테스트가 가능합니다. 아래 표에서 실연동 테스트를 실행하세요.`
+      title: "실제 연결 테스트를 실행하세요.",
+      description: `저장된 계정 중 ${liveReadyAccounts.length}개는 실제 외부 테스트가 가능합니다. 아래 표에서 계정별 연결 테스트를 실행하세요.`
     };
   }
 
   if (formReadiness.state === "LIVE_READY") {
     return {
-      title: "이 계정을 저장한 뒤 실연동 테스트를 실행하세요.",
-      description: "현재 SEARCH_AD 입력값은 즉시 실제 연결 점검을 실행할 수 있는 상태입니다."
+      title: "이 계정을 저장한 뒤 실제 연결 테스트를 실행하세요.",
+      description: currentType === "SEARCH_AD" ? "현재 SEARCH_AD 입력값은 즉시 실제 연결 점검을 실행할 수 있는 상태입니다." : "현재 COMMERCE 입력값은 즉시 실제 연결 점검과 스마트스토어 상품 불러오기를 진행할 수 있는 상태입니다."
     };
   }
 
   if (formReadiness.state === "VALIDATION_READY") {
     return {
       title: "현재 검증 흐름용으로 이 계정을 저장하세요.",
-      description: currentType === "COMMERCE" ? "커머스 계정은 지금 저장하고 검증한 뒤, 이후 실연동 어댑터 테스트로 확장할 수 있습니다." : "이 계정은 현재 비실연동 검증 흐름에 사용할 수 있습니다."
+      description: currentType === "COMMERCE" ? "커머스 계정은 지금 저장한 뒤 실제 연결 테스트와 스마트스토어 상품 불러오기를 바로 진행할 수 있습니다." : "이 계정은 현재 비실연동 검증 흐름에 사용할 수 있습니다."
     };
   }
 
@@ -2005,29 +2920,38 @@ function getCurrentRequiredFields(type: ApiAccountFormInput["type"]) {
   }
 
   if (type === "COMMERCE") {
-    return ["계정명", "클라이언트 ID", "클라이언트 시크릿", "액세스 라이선스", "시크릿 키", "스토어 ID 또는 채널 ID"];
+    return ["계정명", "클라이언트 ID", "클라이언트 시크릿", "스토어 ID 또는 채널 ID"];
   }
 
   return ["계정명", "클라이언트 ID", "클라이언트 시크릿"];
 }
 
-function buildFormReadinessPreview(input: ApiAccountFormInput): FormReadinessPreview {
-  const missingFields = getFormMissingFields(input);
+function buildFormReadinessPreview(input: ApiAccountFormInput, editingAccount?: ApiAccount | null): FormReadinessPreview {
+  const missingFields = getFormMissingFields(input, editingAccount);
 
   if (input.type === "SEARCH_AD" && missingFields.length === 0) {
     return {
       state: "LIVE_READY",
       title: "이 계정은 바로 저장 후 실제 검색광고 연결 테스트를 실행할 수 있습니다.",
-      caption: "검색광고 필수 항목이 모두 입력되었습니다.",
+      caption: editingAccount ? "저장된 비밀값을 유지하거나 새 값으로 교체할 수 있습니다." : "검색광고 필수 항목이 모두 입력되었습니다.",
       missingFields
     };
   }
 
-  if (input.type !== "SEARCH_AD" && missingFields.length === 0) {
+  if (input.type === "COMMERCE" && missingFields.length === 0) {
+    return {
+      state: "VALIDATION_READY",
+      title: "이 계정은 저장 후 바로 커머스 실테스트와 상품 불러오기를 진행할 수 있습니다.",
+      caption: editingAccount ? "기존 인증값은 유지되고, 입력한 값만 새로 반영됩니다." : "커머스 판매자 토큰 발급과 상품 조회에 필요한 입력이 준비되었습니다.",
+      missingFields
+    };
+  }
+
+  if (missingFields.length === 0) {
     return {
       state: "VALIDATION_READY",
       title: "이 계정은 현재 검증 흐름에 사용할 준비가 되었습니다.",
-      caption: input.type === "COMMERCE" ? "커머스 실연동 호출은 아직 후속 작업입니다." : "커스텀 계정은 현재 기본 검증만 지원합니다.",
+      caption: "커스텀 계정은 현재 기본 검증만 지원합니다.",
       missingFields
     };
   }
@@ -2040,26 +2964,30 @@ function buildFormReadinessPreview(input: ApiAccountFormInput): FormReadinessPre
   };
 }
 
-function getFormMissingFields(input: ApiAccountFormInput) {
+function getFormMissingFields(input: ApiAccountFormInput, editingAccount?: ApiAccount | null) {
   const missingFields: string[] = [];
+  const hasSavedClientId = Boolean(editingAccount?.clientIdMasked);
+  const hasSavedClientSecret = Boolean(editingAccount?.clientSecretMasked);
+  const hasSavedAccessLicense = Boolean(editingAccount?.accessLicenseMasked);
+  const hasSavedSecretKey = Boolean(editingAccount?.secretKeyMasked);
 
   if (!input.name.trim()) {
     missingFields.push("계정명");
   }
 
-  if (!input.clientId.trim()) {
+  if (!input.clientId.trim() && !hasSavedClientId) {
     missingFields.push("클라이언트 ID");
   }
 
-  if (!input.clientSecret.trim()) {
+  if (!input.clientSecret.trim() && !hasSavedClientSecret) {
     missingFields.push("클라이언트 시크릿");
   }
 
   if (input.type === "SEARCH_AD") {
-    if (!(input.accessLicense ?? "").trim()) {
+    if (!(input.accessLicense ?? "").trim() && !hasSavedAccessLicense) {
       missingFields.push("액세스 라이선스");
     }
-    if (!(input.secretKey ?? "").trim()) {
+    if (!(input.secretKey ?? "").trim() && !hasSavedSecretKey) {
       missingFields.push("시크릿 키");
     }
     if (!(input.customerId ?? "").trim()) {
@@ -2068,12 +2996,6 @@ function getFormMissingFields(input: ApiAccountFormInput) {
   }
 
   if (input.type === "COMMERCE") {
-    if (!(input.accessLicense ?? "").trim()) {
-      missingFields.push("액세스 라이선스");
-    }
-    if (!(input.secretKey ?? "").trim()) {
-      missingFields.push("시크릿 키");
-    }
     if (!(input.storeId ?? "").trim() && !(input.channelId ?? "").trim()) {
       missingFields.push("스토어 ID 또는 채널 ID");
     }
@@ -2084,6 +3006,10 @@ function getFormMissingFields(input: ApiAccountFormInput) {
 
 function getAccountReadinessState(account: ApiAccount): AccountReadinessState {
   if (isLiveReadySearchAdAccount(account)) {
+    return "LIVE_READY";
+  }
+
+  if (account.type === "COMMERCE" && isValidationReadyAccount(account)) {
     return "LIVE_READY";
   }
 
@@ -2105,7 +3031,7 @@ function getAccountReadinessHint(account: ApiAccount) {
 
   if (account.type === "COMMERCE") {
     return isValidationReadyAccount(account)
-      ? "검증 전용 점검 가능"
+      ? "실제 커머스 테스트 및 상품 불러오기 가능"
       : `누락: ${missingFields.join(", ")}`;
   }
 
@@ -2138,12 +3064,6 @@ function getAccountMissingFields(account: ApiAccount) {
   }
 
   if (account.type === "COMMERCE") {
-    if (!account.accessLicenseMasked) {
-      missingFields.push("액세스 라이선스");
-    }
-    if (!account.secretKeyMasked) {
-      missingFields.push("시크릿 키");
-    }
     if (!account.storeId && !account.channelId) {
       missingFields.push("스토어 ID 또는 채널 ID");
     }
@@ -2153,7 +3073,7 @@ function getAccountMissingFields(account: ApiAccount) {
 }
 
 function buildAccountReadinessSummary(accounts: ApiAccount[], recentLogCount: number): AccountReadinessSummary[] {
-  const liveReadyCount = accounts.filter(isLiveReadySearchAdAccount).length;
+  const liveReadyCount = accounts.filter((account) => getAccountReadinessState(account) === "LIVE_READY").length;
   const validationReadyCount = accounts.filter(isValidationReadyAccount).length;
   const activeCount = accounts.filter((account) => account.isActive).length;
 
@@ -2166,12 +3086,12 @@ function buildAccountReadinessSummary(accounts: ApiAccount[], recentLogCount: nu
     {
       label: "실테스트 가능",
       value: liveReadyCount,
-      caption: "SEARCH_AD 자격정보 입력 완료"
+      caption: "실제 연결 테스트 가능한 계정 수"
     },
     {
       label: "검증 가능",
       value: validationReadyCount,
-      caption: "비실연동 점검 가능"
+      caption: "기본 검증 또는 준비 상태"
     },
     {
       label: "최근 테스트",
@@ -2205,7 +3125,7 @@ function buildAccountLogFocusCards(logs: AccountTestLogViewRow[]): AccountLogFoc
     {
       label: "저장된 계정",
       value: realCount,
-      caption: realCount > 0 ? "실제 검색광고 점검이 실행되었습니다." : "최근 로그 구간에 실연동 테스트가 없습니다.",
+      caption: realCount > 0 ? "실제 외부 API 점검이 실행되었습니다." : "최근 로그 구간에 실연동 테스트가 없습니다.",
       toneClass: "info",
       filterValue: "REAL"
     },
@@ -2233,7 +3153,7 @@ function isValidationReadyAccount(account: ApiAccount) {
   }
 
   if (account.type === "COMMERCE") {
-    return Boolean(account.accessLicenseMasked && account.secretKeyMasked && (account.storeId || account.channelId));
+    return Boolean(account.clientIdMasked && account.clientSecretMasked && (account.storeId || account.channelId));
   }
 
   return Boolean(account.clientIdMasked && account.clientSecretMasked);
@@ -2244,6 +3164,16 @@ type ParsedApiAccountTestMeta = {
   accountType?: string | null;
   mode?: string | null;
   statusCode?: number | null;
+  details?: string | null;
+};
+
+type ParsedProductImportMeta = {
+  accountId?: string | null;
+  sellerIdentifier?: string | null;
+  totalFetched?: number | null;
+  createdCount?: number | null;
+  updatedCount?: number | null;
+  skippedCount?: number | null;
   details?: string | null;
 };
 
@@ -2270,6 +3200,54 @@ function formatParsedApiAccountTestMeta(parsed: ParsedApiAccountTestMeta, fallba
   return parts.length > 0 ? parts.join(" | ") : fallback ?? "-";
 }
 
+function parseProductImportMeta(metaJson?: string | null): ParsedProductImportMeta {
+  if (!metaJson) {
+    return {};
+  }
+
+  try {
+    return JSON.parse(metaJson) as ParsedProductImportMeta;
+  } catch {
+    return {};
+  }
+}
+function formatProductImportDetailMessage(detail?: string | null) {
+  if (!detail) {
+    return '';
+  }
+
+  if (detail.includes('클라이언트 ID와 클라이언트 시크릿이 필요합니다.')) {
+    return '클라이언트 ID와 시크릿이 비어 있어 스마트스토어 인증을 시작할 수 없습니다.';
+  }
+
+  if (detail.includes('채널 ID 또는 스토어 ID에 판매자 UID/ID를 먼저 저장해 주세요.')) {
+    return '스토어 ID 또는 채널 ID가 없어 판매자 식별값을 먼저 확인해야 합니다.';
+  }
+
+  if (detail.includes('활성 COMMERCE API 계정을 먼저 등록해 주세요.')) {
+    return '사용 가능한 COMMERCE 계정이 없어 먼저 API 계정을 등록해야 합니다.';
+  }
+
+  if (detail.includes('스마트스토어 상품 목록 조회에 실패했습니다.')) {
+    return '스마트스토어 상품 목록 조회에 실패했습니다. 인증값과 스토어 권한을 다시 확인해 주세요.';
+  }
+
+  return String(detail).slice(0, 120);
+}
+
+function formatParsedProductImportMeta(parsed: ParsedProductImportMeta, fallback?: string | null) {
+  const parts = [
+    parsed.sellerIdentifier ? `스토어=${parsed.sellerIdentifier}` : "",
+    typeof parsed.totalFetched === "number" ? `조회=${parsed.totalFetched}개` : "",
+    typeof parsed.createdCount === "number" ? `신규=${parsed.createdCount}개` : "",
+    typeof parsed.updatedCount === "number" ? `업데이트=${parsed.updatedCount}개` : "",
+    typeof parsed.skippedCount === "number" ? `제외=${parsed.skippedCount}개` : "",
+    formatProductImportDetailMessage(parsed.details)
+  ].filter(Boolean);
+
+  return parts.length > 0 ? parts.join(" | ") : fallback ?? "추가 메타 정보 없음";
+}
+
 function isApiAccountLogFailure(level: string) {
   return ["ERROR", "FAILED", "WARN"].includes(level.toUpperCase());
 }
@@ -2283,3 +3261,19 @@ function formatDateTime(value: string) {
     minute: "2-digit"
   });
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

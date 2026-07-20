@@ -13,9 +13,14 @@ import { DataGrid } from "./components/DataGrid";
 import { SparklineBars } from "./components/SparklineBars";
 import { StatusBadge } from "./components/StatusBadge";
 import {
+  applyProductTitle,
+  completeExperiment,
   createApiAccount,
   fetchSnapshot,
+  pauseExperiment,
+  rollbackProductTitle,
   runTrackingJob,
+  startExperiment,
   testApiAccountConnection,
   updateApiAccount
 } from "./lib/api";
@@ -88,6 +93,31 @@ export function App() {
     await loadSnapshot();
   }
 
+  async function handleExperimentAction(experimentId: string, action: "start" | "pause" | "complete") {
+    if (action === "start") {
+      await startExperiment(experimentId);
+    } else if (action === "pause") {
+      await pauseExperiment(experimentId);
+    } else {
+      await completeExperiment(experimentId);
+    }
+
+    await loadSnapshot();
+  }
+
+  async function handleApplyProductTitle(product: Product, afterTitle: string) {
+    await applyProductTitle(product.id, {
+      afterTitle,
+      reason: "Applied from product grid"
+    });
+    await loadSnapshot();
+  }
+
+  async function handleRollbackProductTitle(product: Product) {
+    await rollbackProductTitle(product.id, "Rollback from product grid");
+    await loadSnapshot();
+  }
+
   return (
     <div className="app-shell">
       <aside className="sidebar">
@@ -126,8 +156,16 @@ export function App() {
                 onToggleAccount={handleToggleApiAccount}
               />
             )}
-            {view === "products" && <ProductsView products={snapshot.products} />}
-            {view === "experiments" && <ExperimentsView experiments={snapshot.experiments} />}
+            {view === "products" && (
+              <ProductsView
+                products={snapshot.products}
+                onApplyTitle={handleApplyProductTitle}
+                onRollbackTitle={handleRollbackProductTitle}
+              />
+            )}
+            {view === "experiments" && (
+              <ExperimentsView experiments={snapshot.experiments} onAction={handleExperimentAction} />
+            )}
             {view === "tracking" && <TrackingJobsView jobs={snapshot.jobs} onRunJob={handleRunJob} />}
             {view === "results" && <ResultsView results={snapshot.results} />}
           </>
@@ -323,7 +361,43 @@ function ApiAccountsView({
   );
 }
 
-function ProductsView({ products }: { products: Product[] }) {
+function ProductsView({
+  products,
+  onApplyTitle,
+  onRollbackTitle
+}: {
+  products: Product[];
+  onApplyTitle: (product: Product, afterTitle: string) => Promise<void>;
+  onRollbackTitle: (product: Product) => Promise<void>;
+}) {
+  const [titleDrafts, setTitleDrafts] = useState<Record<string, string>>({});
+  const [pendingTitleAction, setPendingTitleAction] = useState<{
+    type: "apply" | "rollback";
+    product: Product;
+    afterTitle?: string;
+  } | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleConfirmTitleAction() {
+    if (!pendingTitleAction) {
+      return;
+    }
+
+    setSubmitting(true);
+
+    try {
+      if (pendingTitleAction.type === "apply") {
+        await onApplyTitle(pendingTitleAction.product, pendingTitleAction.afterTitle ?? "");
+      } else {
+        await onRollbackTitle(pendingTitleAction.product);
+      }
+
+      setPendingTitleAction(null);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   return (
     <section className="panel">
       <div className="section-heading">
@@ -337,7 +411,18 @@ function ProductsView({ products }: { products: Product[] }) {
           { key: "smartStoreProductId", title: "스마트스토어 상품 ID", width: 200, sticky: true },
           { key: "sellerManagementCode", title: "판매자관리코드", width: 160 },
           { key: "currentTitle", title: "현재 상품명", width: 300 },
-          { key: "seoOptimizedTitle", title: "SEO 상품명", width: 320 },
+          {
+            key: "seoOptimizedTitle",
+            title: "SEO 상품명",
+            width: 360,
+            render: (row) => (
+              <input
+                className="grid-input"
+                value={titleDrafts[row.id] ?? row.seoOptimizedTitle ?? ""}
+                onChange={(event) => setTitleDrafts({ ...titleDrafts, [row.id]: event.target.value })}
+              />
+            )
+          },
           { key: "primaryKeyword", title: "대표 키워드", width: 150 },
           {
             key: "trackingKeywords",
@@ -351,15 +436,70 @@ function ProductsView({ products }: { products: Product[] }) {
             title: "테스트 상태",
             width: 130,
             render: (row) => <StatusBadge value={row.testStatus} />
+          },
+          {
+            key: "actions",
+            title: "작업",
+            width: 220,
+            render: (row) => {
+              const afterTitle = titleDrafts[row.id] ?? row.seoOptimizedTitle ?? "";
+
+              return (
+                <div className="inline-actions">
+                  <button
+                    type="button"
+                    className="action-button secondary"
+                    disabled={!afterTitle.trim()}
+                    onClick={() => setPendingTitleAction({ type: "apply", product: row, afterTitle })}
+                  >
+                    적용
+                  </button>
+                  <button
+                    type="button"
+                    className="action-button secondary"
+                    onClick={() => setPendingTitleAction({ type: "rollback", product: row })}
+                  >
+                    롤백
+                  </button>
+                </div>
+              );
+            }
           }
         ]}
         rows={products}
       />
+      {pendingTitleAction && (
+        <ConfirmDialog
+          title={pendingTitleAction.type === "apply" ? "상품명 적용" : "상품명 롤백"}
+          confirmLabel={submitting ? "처리 중..." : pendingTitleAction.type === "apply" ? "적용" : "롤백"}
+          disabled={submitting}
+          onCancel={() => setPendingTitleAction(null)}
+          onConfirm={() => void handleConfirmTitleAction()}
+        >
+          {pendingTitleAction.type === "apply" ? (
+            <div className="confirm-copy">
+              <span>{pendingTitleAction.product.currentTitle}</span>
+              <strong>{pendingTitleAction.afterTitle}</strong>
+            </div>
+          ) : (
+            <div className="confirm-copy">
+              <span>{pendingTitleAction.product.currentTitle}</span>
+              <strong>최근 성공한 변경 이력의 이전 상품명으로 되돌립니다.</strong>
+            </div>
+          )}
+        </ConfirmDialog>
+      )}
     </section>
   );
 }
 
-function ExperimentsView({ experiments }: { experiments: SeoExperiment[] }) {
+function ExperimentsView({
+  experiments,
+  onAction
+}: {
+  experiments: SeoExperiment[];
+  onAction: (experimentId: string, action: "start" | "pause" | "complete") => Promise<void>;
+}) {
   return (
     <section className="panel">
       <div className="section-heading">
@@ -386,11 +526,83 @@ function ExperimentsView({ experiments }: { experiments: SeoExperiment[] }) {
             width: 120,
             render: (row) => <StatusBadge value={row.judgement} />
           },
-          { key: "summary", title: "요약", width: 240 }
+          {
+            key: "trackingKeywords",
+            title: "추적 키워드",
+            width: 240,
+            render: (row) => row.trackingKeywords.join(", ")
+          },
+          { key: "summary", title: "요약", width: 240 },
+          {
+            key: "actions",
+            title: "작업",
+            width: 260,
+            render: (row) => (
+              <div className="inline-actions">
+                <button
+                  type="button"
+                  className="action-button secondary"
+                  disabled={row.status === "RUNNING"}
+                  onClick={() => void onAction(row.id, "start")}
+                >
+                  시작
+                </button>
+                <button
+                  type="button"
+                  className="action-button secondary"
+                  disabled={row.status !== "RUNNING"}
+                  onClick={() => void onAction(row.id, "pause")}
+                >
+                  일시정지
+                </button>
+                <button
+                  type="button"
+                  className="action-button secondary"
+                  disabled={row.status === "COMPLETED"}
+                  onClick={() => void onAction(row.id, "complete")}
+                >
+                  완료
+                </button>
+              </div>
+            )
+          }
         ]}
         rows={experiments}
       />
     </section>
+  );
+}
+
+function ConfirmDialog({
+  title,
+  confirmLabel,
+  disabled,
+  children,
+  onCancel,
+  onConfirm
+}: {
+  title: string;
+  confirmLabel: string;
+  disabled?: boolean;
+  children: import("react").ReactNode;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <div className="modal-backdrop" role="presentation">
+      <div className="modal-panel" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+        <h3 id="confirm-title">{title}</h3>
+        {children}
+        <div className="modal-actions">
+          <button type="button" className="action-button secondary" disabled={disabled} onClick={onCancel}>
+            취소
+          </button>
+          <button type="button" className="action-button" disabled={disabled} onClick={onConfirm}>
+            {confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 

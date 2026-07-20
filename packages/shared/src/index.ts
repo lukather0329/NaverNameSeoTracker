@@ -122,6 +122,7 @@ export interface SeoExperiment {
   productId: string;
   beforeTitle: string;
   afterTitle: string;
+  trackingKeywords: string[];
   appliedAt?: string | null;
   trackingInterval: TrackingInterval;
   startDate: string;

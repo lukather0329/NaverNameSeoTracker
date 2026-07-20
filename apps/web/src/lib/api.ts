@@ -67,3 +67,47 @@ export async function testApiAccountConnection(accountId: string) {
 
   return response.json();
 }
+
+export async function startExperiment(experimentId: string) {
+  return postJson(`${API_BASE_URL}/experiments/${experimentId}/start`, {});
+}
+
+export async function pauseExperiment(experimentId: string) {
+  return postJson(`${API_BASE_URL}/experiments/${experimentId}/pause`, {});
+}
+
+export async function completeExperiment(experimentId: string) {
+  return postJson(`${API_BASE_URL}/experiments/${experimentId}/complete`, {});
+}
+
+export async function applyProductTitle(productId: string, input: { afterTitle: string; reason?: string }) {
+  return postJson(`${API_BASE_URL}/products/${productId}/title/apply`, {
+    ...input,
+    mode: "VALIDATION",
+    confirmed: true
+  });
+}
+
+export async function rollbackProductTitle(productId: string, reason?: string) {
+  return postJson(`${API_BASE_URL}/products/${productId}/title/rollback`, {
+    confirmed: true,
+    reason
+  });
+}
+
+async function postJson(url: string, body: unknown) {
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(body)
+  });
+
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(message || "Request failed");
+  }
+
+  return response.json();
+}

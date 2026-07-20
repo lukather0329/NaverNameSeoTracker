@@ -2,13 +2,20 @@ import type { DashboardSummary } from "@naver-seo-tracker/shared";
 import { prisma } from "../lib/prisma.js";
 
 export async function getDashboardSummary(): Promise<DashboardSummary> {
+  const now = new Date();
+  const since = new Date(now.getTime() - 24 * 60 * 60 * 1000);
   const [runningExperiments, latestResults] = await Promise.all([
     prisma.seoExperiment.count({
       where: { status: "RUNNING" }
     }),
     prisma.rankTrackingResult.findMany({
+      where: {
+        trackedAt: {
+          gte: since
+        }
+      },
       orderBy: { trackedAt: "desc" },
-      take: 40
+      take: 500
     })
   ]);
 
@@ -21,7 +28,9 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
     : 0;
 
   const last24hPoints = Array.from({ length: 8 }, (_, index) => {
-    const chunk = latestResults.slice(index * 5, index * 5 + 5);
+    const bucketStart = new Date(since.getTime() + index * 3 * 60 * 60 * 1000);
+    const bucketEnd = new Date(bucketStart.getTime() + 3 * 60 * 60 * 1000);
+    const chunk = latestResults.filter((item) => item.trackedAt >= bucketStart && item.trackedAt < bucketEnd);
 
     return {
       label: `${24 - index * 3}h`,
@@ -29,7 +38,7 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
       down: chunk.filter((item) => item.deltaStatus === "DOWN").length,
       same: chunk.filter((item) => item.deltaStatus === "SAME").length
     };
-  }).reverse();
+  });
 
   return {
     runningExperiments,

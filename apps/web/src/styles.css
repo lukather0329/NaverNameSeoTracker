@@ -1273,6 +1273,39 @@ select {
   gap: 8px;
 }
 
+.page-size-field {
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-soft);
+  justify-items: end;
+}
+
+.page-size-field select {
+  min-height: 34px;
+  padding: 4px 10px;
+  font-size: 13px;
+  color: var(--text-main);
+  border: 1px solid rgba(224, 229, 250, 0.96);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.98);
+}
+
+.pagination-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.pagination-bar .inline-actions {
+  align-items: center;
+  gap: 12px;
+}
+
 .product-filter-actions {
   align-items: center;
   justify-content: space-between;

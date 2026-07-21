@@ -962,6 +962,8 @@ function ProductsView({
   const [productStatusFilter, setProductStatusFilter] = useState<'ALL' | Product['testStatus']>('ALL');
   const [categoryFilter, setCategoryFilter] = useState('ALL');
   const [seoReadyOnly, setSeoReadyOnly] = useState(false);
+  const [productPage, setProductPage] = useState(1);
+  const [productPageSize, setProductPageSize] = useState(10);
   const [selectedDetailProductId, setSelectedDetailProductId] = useState<string | null>(products[0]?.id ?? null);
   const [detailForm, setDetailForm] = useState({ seoOptimizedTitle: '', primaryKeyword: '', trackingKeywords: '' });
   const [runningDecisionProjection, setRunningDecisionProjection] = useState(false);
@@ -1025,6 +1027,16 @@ function ProductsView({
     const matchesSeo = !seoReadyOnly || Boolean(product.seoOptimizedTitle?.trim());
     return matchesQuery && matchesStatus && matchesCategory && matchesSeo;
   });
+  const totalProductPages = Math.max(1, Math.ceil(filteredProducts.length / productPageSize));
+  const paginatedProducts = filteredProducts.slice((productPage - 1) * productPageSize, (productPage - 1) * productPageSize + productPageSize);
+
+  useEffect(() => {
+    setProductPage(1);
+  }, [productSearchQuery, productStatusFilter, categoryFilter, seoReadyOnly, productPageSize]);
+
+  useEffect(() => {
+    setProductPage((current) => Math.min(current, totalProductPages));
+  }, [totalProductPages]);
 
   const selectedDetailProduct =
     filteredProducts.find((product) => product.id === selectedDetailProductId) ??
@@ -1386,6 +1398,15 @@ function ProductsView({
             <p className="eyebrow">상품 테이블</p>
             <h2>상품 목록</h2>
           </div>
+          <label className="page-size-field">
+            <span>페이지당 표시</span>
+            <select value={productPageSize} onChange={(event) => setProductPageSize(Number(event.target.value))}>
+              <option value={10}>10개</option>
+              <option value={20}>20개</option>
+              <option value={50}>50개</option>
+              <option value={100}>100개</option>
+            </select>
+          </label>
         </div>
         <DataGrid
           columns={[
@@ -1407,8 +1428,20 @@ function ProductsView({
               )
             }
           ]}
-          rows={filteredProducts}
+          rows={paginatedProducts}
         />
+        <div className="pagination-bar">
+          <span className="helper-copy">{'전체 ' + filteredProducts.length + '개 중 ' + (filteredProducts.length === 0 ? 0 : (productPage - 1) * productPageSize + 1) + '-' + Math.min(productPage * productPageSize, filteredProducts.length) + '개 표시'}</span>
+          <div className="inline-actions">
+            <button type="button" className="action-button secondary" onClick={() => setProductPage((current) => Math.max(1, current - 1))} disabled={productPage <= 1}>
+              이전 페이지
+            </button>
+            <span className="helper-copy">{productPage + ' / ' + totalProductPages + ' 페이지'}</span>
+            <button type="button" className="action-button secondary" onClick={() => setProductPage((current) => Math.min(totalProductPages, current + 1))} disabled={productPage >= totalProductPages}>
+              다음 페이지
+            </button>
+          </div>
+        </div>
       </section>
 
       {selectedDetailProduct ? (

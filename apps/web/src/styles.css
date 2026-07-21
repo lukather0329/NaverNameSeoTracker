@@ -643,12 +643,16 @@ select {
   min-width: 170px;
 }
 
-.grid-cell .inline-actions .action-button {
+.grid-cell .action-button {
   min-height: 20px;
   justify-content: center;
   padding: 2px 8px;
   font-size: 10px;
   box-sizing: border-box;
+}
+
+.grid-cell .inline-actions .action-button {
+  width: auto;
 }
 
 .feedback-banner {
@@ -884,16 +888,25 @@ select {
 
 .grid-cell {
   position: relative;
+  display: flex;
+  align-items: center;
   flex: 0 0 auto;
   padding: 4px 8px;
   border-right: 1px solid rgba(224, 229, 250, 0.96);
   border-bottom: 1px solid rgba(224, 229, 250, 0.82);
   color: var(--text-main);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
   font-size: 10px;
   line-height: 1.4;
+}
+
+.grid-cell-content {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .grid-cell.sticky {

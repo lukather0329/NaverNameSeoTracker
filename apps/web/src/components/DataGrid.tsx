@@ -36,7 +36,7 @@ export function DataGrid<T extends { id: string }>({ columns, rows }: DataGridPr
               className={`grid-cell ${column.sticky ? "sticky" : ""}`}
               style={{ width: widths[String(column.key)], left: column.sticky ? index * 180 : undefined }}
             >
-              <span>{column.title}</span>
+              <span className="grid-cell-content">{column.title}</span>
               <button
                 type="button"
                 className="resize-handle"
@@ -54,7 +54,9 @@ export function DataGrid<T extends { id: string }>({ columns, rows }: DataGridPr
                 className={`grid-cell ${column.sticky ? "sticky" : ""}`}
                 style={{ width: widths[String(column.key)], left: column.sticky ? index * 180 : undefined }}
               >
-                {column.render ? column.render(row) : String((row as Record<string, unknown>)[String(column.key)] ?? "")}
+                <span className="grid-cell-content">
+                  {column.render ? column.render(row) : String((row as Record<string, unknown>)[String(column.key)] ?? "")}
+                </span>
               </div>
             ))}
           </div>

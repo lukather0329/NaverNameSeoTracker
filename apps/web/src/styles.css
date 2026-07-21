@@ -634,18 +634,17 @@ select {
 }
 
 .grid-cell .inline-actions {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
   min-width: 170px;
 }
 
 .grid-cell .inline-actions .action-button {
-  width: 100%;
-  min-height: 38px;
+  min-height: 20px;
   justify-content: center;
-  padding: 10px 12px;
-  font-size: 12px;
+  padding: 2px 8px;
+  font-size: 10px;
   box-sizing: border-box;
 }
 
@@ -874,22 +873,24 @@ select {
 
 .grid-header .grid-cell {
   color: var(--text-faint);
-  font-size: 12px;
+  font-size: 10px;
   font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
 }
 
 .grid-cell {
   position: relative;
   flex: 0 0 auto;
-  padding: 15px 16px;
+  padding: 4px 8px;
   border-right: 1px solid rgba(224, 229, 250, 0.96);
   border-bottom: 1px solid rgba(224, 229, 250, 0.82);
   color: var(--text-main);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  font-size: 10px;
+  line-height: 1.4;
 }
 
 .grid-cell.sticky {
@@ -910,10 +911,10 @@ select {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 86px;
-  padding: 7px 11px;
+  min-width: 62px;
+  padding: 2px 8px;
   border-radius: 999px;
-  font-size: 11px;
+  font-size: 9px;
   font-weight: 800;
   letter-spacing: 0.03em;
 }

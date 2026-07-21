@@ -73,7 +73,7 @@ export async function importProductsFromCommerceAccount(account: CommerceApiAcco
     throw new Error("클라이언트 ID와 클라이언트 시크릿이 필요합니다.");
   }
 
-  const sellerIdentifier = (account.channelId ?? account.storeId ?? "").trim();
+  const sellerIdentifier = (account.channelId || account.storeId || "").trim();
 
   if (!sellerIdentifier) {
     throw new Error("채널 ID 또는 스토어 ID에 판매자 UID/ID를 먼저 저장해 주세요.");

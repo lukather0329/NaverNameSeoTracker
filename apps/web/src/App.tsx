@@ -247,14 +247,14 @@ export function App() {
   }
   async function handleCreateExperimentDraft(product: Product) {
     const experiment = await createExperimentDraft({
-      name: product.currentTitle + ' SEO ??',
+      name: product.currentTitle + ' SEO 검증',
       productId: product.id,
       beforeTitle: product.currentTitle,
       afterTitle: product.seoOptimizedTitle?.trim() || product.currentTitle,
       trackingInterval: "60_MINUTES",
       startDate: new Date().toISOString(),
       minObservationHours: 24,
-      notes: '?? ?? ???? ??? ??'
+      notes: '상품 상세에서 자동 생성한 실험 초안입니다.'
     });
     setFocusExperimentId(typeof experiment?.id === 'string' ? experiment.id : null);
     await loadSnapshot();
@@ -544,13 +544,20 @@ function ApiAccountsView({
     }
   }
   async function handleTest(accountId: string) {
-    const result = await onTestAccount(accountId);
-    const suffix = [result.mode ? `mode=${result.mode}` : "", result.statusCode ? `status=${result.statusCode}` : "", result.details ?? ""]
-      .filter(Boolean)
-      .join(" | ");
-    const message = suffix ? `${result.message} (${suffix})` : result.message;
-    const tone = result.ok ? (result.mode === "real" ? "success" : "info") : "error";
-    setFeedback({ tone, message });
+    try {
+      const result = await onTestAccount(accountId);
+      const suffix = [result.mode ? `mode=${result.mode}` : "", result.statusCode ? `status=${result.statusCode}` : "", result.details ?? ""]
+        .filter(Boolean)
+        .join(" | ");
+      const message = suffix ? `${result.message} (${suffix})` : result.message;
+      const tone = result.ok ? (result.mode === "real" ? "success" : "info") : "error";
+      setFeedback({ tone, message });
+      window.alert((result.ok ? "[성공] " : "[실패] ") + result.message);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "API 계정 테스트 중 오류가 발생했습니다.";
+      setFeedback({ tone: "error", message });
+      window.alert("[실패] " + message);
+    }
   }
 
   return (
@@ -1740,23 +1747,23 @@ function ExperimentsView({ experiments, focusExperimentId }: { experiments: SeoE
       ) : null}
       <DataGrid
         columns={[
-          { key: "name", title: "????", width: 220, sticky: true },
-          { key: "beforeTitle", title: "?? ?", width: 240 },
-          { key: "afterTitle", title: "?? ?", width: 280 },
-          { key: "trackingInterval", title: "??", width: 120 },
+          { key: "name", title: "실험명", width: 220, sticky: true },
+          { key: "beforeTitle", title: "변경 전 제목", width: 240 },
+          { key: "afterTitle", title: "변경 후 제목", width: 280 },
+          { key: "trackingInterval", title: "주기", width: 120 },
           {
             key: "status",
-            title: "??",
+            title: "상태",
             width: 120,
             render: (row) => <StatusBadge value={row.status} />
           },
           {
             key: "judgement",
-            title: "??",
+            title: "판단",
             width: 120,
             render: (row) => <StatusBadge value={row.judgement} />
           },
-          { key: "summary", title: "??", width: 240, render: (row) => row.id === focusExperimentId ? "?? ?? ??" : (row.summary ?? "-") }
+          { key: "summary", title: "요약", width: 240, render: (row) => row.id === focusExperimentId ? "방금 만든 초안" : (row.summary ?? "-") }
         ]}
         rows={filteredExperiments}
       />

@@ -106,7 +106,7 @@ async function testSearchAdConnection(account: StoredApiAccount): Promise<ApiCon
 }
 
 async function testCommerceConnection(account: StoredApiAccount): Promise<ApiConnectionTestResult> {
-  const sellerIdentifier = (account.channelId ?? account.storeId ?? "").trim();
+  const sellerIdentifier = (account.channelId || account.storeId || "").trim();
 
   if (!account.clientId.trim() || !account.clientSecret.trim()) {
     return {

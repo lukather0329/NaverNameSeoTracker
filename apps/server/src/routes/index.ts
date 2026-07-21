@@ -290,8 +290,8 @@ router.put("/products/:id", async (req, res) => {
   const product = await prisma.product.update({
     where: { id: req.params.id },
     data: {
-      seoOptimizedTitle: input.seoOptimizedTitle ?? null,
-      primaryKeyword: input.primaryKeyword ?? null,
+      seoOptimizedTitle: input.seoOptimizedTitle,
+      primaryKeyword: input.primaryKeyword,
       trackingKeywords: input.trackingKeywords ? input.trackingKeywords.filter(Boolean).join(",") : undefined
     }
   });

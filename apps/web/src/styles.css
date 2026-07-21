@@ -137,14 +137,14 @@ select {
 
 .nav-list {
   display: grid;
-  gap: 10px;
-  margin: 28px 0;
+  gap: 6px;
+  margin: 20px 0;
 }
 
 .nav-item,
 .refresh-button,
 .action-button {
-  border-radius: 18px;
+  border-radius: 14px;
   cursor: pointer;
   transition:
     transform 160ms ease,
@@ -162,10 +162,11 @@ select {
 .nav-item {
   display: flex;
   align-items: center;
-  min-height: 48px;
-  padding: 13px 16px;
+  min-height: 34px;
+  padding: 8px 14px;
   text-align: left;
   font-weight: 700;
+  font-size: 13px;
   color: var(--text-soft);
   background: transparent;
 }
@@ -178,8 +179,9 @@ select {
 
 .refresh-button,
 .action-button {
-  padding: 12px 18px;
+  padding: 8px 14px;
   font-weight: 700;
+  font-size: 13px;
   color: #ffffff;
   background: var(--bg-button);
   box-shadow: 0 12px 24px rgba(117, 81, 255, 0.24);
@@ -250,7 +252,7 @@ select {
 
 .card-grid {
   display: grid;
-  gap: 18px;
+  gap: 10px;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
 }
 
@@ -407,19 +409,19 @@ select {
 
 .guide-chip-row {
   display: flex;
-  gap: 8px;
+  gap: 5px;
   flex-wrap: wrap;
 }
 
 .guide-chip {
   display: inline-flex;
   align-items: center;
-  padding: 7px 11px;
+  padding: 3px 9px;
   border-radius: 999px;
   color: #4318ff;
   background: rgba(255, 255, 255, 0.94);
   border: 1px solid rgba(224, 229, 250, 0.96);
-  font-size: 12px;
+  font-size: 10px;
   font-weight: 700;
 }
 
@@ -473,16 +475,17 @@ select {
 }
 
 .compact-card {
-  min-height: 148px;
-  gap: 10px;
+  min-height: 0;
+  padding: 12px 14px;
+  gap: 4px;
 }
 
 .compact-card strong {
-  font-size: 30px;
+  font-size: 20px;
 }
 
 .compact-card small {
-  font-size: 12px;
+  font-size: 10px;
   line-height: 1.45;
 }
 
@@ -541,8 +544,8 @@ select {
 }
 
 .account-form > .action-button {
-  min-height: 48px;
-  align-self: stretch;
+  min-height: 38px;
+  align-self: end;
 }
 
 .account-form label {
@@ -778,8 +781,8 @@ select {
 .form-checklist-card,
 .form-readiness-card {
   display: grid;
-  gap: 12px;
-  padding: 18px 20px;
+  gap: 8px;
+  padding: 12px 16px;
   border: 1px solid rgba(224, 229, 250, 0.96);
   border-radius: 22px;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(245, 248, 255, 0.94));

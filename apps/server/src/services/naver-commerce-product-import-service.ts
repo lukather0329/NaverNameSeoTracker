@@ -74,8 +74,10 @@ function hasProductChanged(
     category: string | null;
     price: number;
     productStatus: string;
+    apiAccountId: string | null;
   },
-  next: ImportedCommerceProduct
+  next: ImportedCommerceProduct,
+  accountId: string
 ) {
   return (
     existing.originProductId !== next.originProductId ||
@@ -84,7 +86,8 @@ function hasProductChanged(
     existing.currentTitle !== next.currentTitle ||
     existing.category !== next.category ||
     existing.price !== next.price ||
-    existing.productStatus !== next.productStatus
+    existing.productStatus !== next.productStatus ||
+    existing.apiAccountId !== accountId
   );
 }
 
@@ -123,7 +126,7 @@ export async function importProductsFromCommerceAccount(account: CommerceApiAcco
       });
 
       if (existing) {
-        if (!hasProductChanged(existing, product)) {
+        if (!hasProductChanged(existing, product, account.id)) {
           unchangedCount += 1;
           continue;
         }
@@ -138,7 +141,8 @@ export async function importProductsFromCommerceAccount(account: CommerceApiAcco
             originalTitle: existing.originalTitle ?? product.currentTitle,
             category: product.category,
             price: product.price,
-            productStatus: product.productStatus
+            productStatus: product.productStatus,
+            apiAccountId: account.id
           }
         });
         updatedCount += 1;
@@ -151,6 +155,7 @@ export async function importProductsFromCommerceAccount(account: CommerceApiAcco
             sellerManagementCode: product.sellerManagementCode,
             currentTitle: product.currentTitle,
             originalTitle: product.currentTitle,
+            apiAccountId: account.id,
             seoOptimizedTitle: null,
             primaryKeyword: null,
             trackingKeywords: "",

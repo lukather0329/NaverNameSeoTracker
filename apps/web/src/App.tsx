@@ -18,6 +18,7 @@ import { StatusBadge } from "./components/StatusBadge";
 import {
   createApiAccount,
   createExperimentDraft,
+  deleteProduct,
   fetchSnapshot,
   importCommerceProducts,
   runDecisionProjection,
@@ -266,6 +267,11 @@ export function App() {
     await loadSnapshot();
   }
 
+  async function handleDeleteProduct(productId: string) {
+    await deleteProduct(productId);
+    await loadSnapshot();
+  }
+
   async function handleRunDecisionProjection(productId: string, input: { seoTitle?: string; primaryKeyword?: string; trackingKeywords?: string[]; targetRank?: number; iterations?: number; seed?: number; horizonDays?: number }) {
     return runDecisionProjection(productId, input);
   }
@@ -314,7 +320,7 @@ export function App() {
                 onToggleAccount={handleToggleApiAccount}
               />
             )}
-            {view === "products" && <ProductsView products={snapshot.products} experiments={snapshot.experiments} titleChangeLogs={snapshot.titleChangeLogs} apiAccounts={snapshot.apiAccounts} systemLogs={snapshot.systemLogs ?? []} onImportProducts={handleImportCommerceProducts} onCreateExperimentDraft={handleCreateExperimentDraft} onUpdateProduct={handleUpdateProduct} onRunDecisionProjection={handleRunDecisionProjection} onOpenExperimentsView={handleOpenExperimentsView} />}
+            {view === "products" && <ProductsView products={snapshot.products} experiments={snapshot.experiments} titleChangeLogs={snapshot.titleChangeLogs} apiAccounts={snapshot.apiAccounts} systemLogs={snapshot.systemLogs ?? []} onImportProducts={handleImportCommerceProducts} onCreateExperimentDraft={handleCreateExperimentDraft} onUpdateProduct={handleUpdateProduct} onDeleteProduct={handleDeleteProduct} onRunDecisionProjection={handleRunDecisionProjection} onOpenExperimentsView={handleOpenExperimentsView} />}
             {view === "experiments" && <ExperimentsView experiments={snapshot.experiments} focusExperimentId={focusExperimentId} />}
             {view === "tracking" && <TrackingJobsView jobs={snapshot.jobs} onRunJob={handleRunJob} />}
             {view === "results" && <ResultsView results={snapshot.results} products={snapshot.products} />}
@@ -939,6 +945,7 @@ function ProductsView({
   onImportProducts,
   onCreateExperimentDraft,
   onUpdateProduct,
+  onDeleteProduct,
   onRunDecisionProjection,
   onOpenExperimentsView
 }: {
@@ -950,6 +957,7 @@ function ProductsView({
   onImportProducts: (apiAccountId?: string) => Promise<ProductImportResponse>;
   onCreateExperimentDraft: (product: Product) => Promise<void>;
   onUpdateProduct: (productId: string, input: { seoOptimizedTitle?: string; primaryKeyword?: string; trackingKeywords?: string[] }) => Promise<void>;
+  onDeleteProduct: (productId: string) => Promise<void>;
   onRunDecisionProjection: (productId: string, input: { seoTitle?: string; primaryKeyword?: string; trackingKeywords?: string[]; targetRank?: number; iterations?: number; seed?: number; horizonDays?: number }) => Promise<DecisionProjectionResponse>;
   onOpenExperimentsView: () => void;
 }) {
@@ -964,6 +972,7 @@ function ProductsView({
   const [seoReadyOnly, setSeoReadyOnly] = useState(false);
   const [productPage, setProductPage] = useState(1);
   const [productPageSize, setProductPageSize] = useState(10);
+  const [deletingProductId, setDeletingProductId] = useState<string | null>(null);
   const [selectedDetailProductId, setSelectedDetailProductId] = useState<string | null>(products[0]?.id ?? null);
   const [detailForm, setDetailForm] = useState({ seoOptimizedTitle: '', primaryKeyword: '', trackingKeywords: '' });
   const [runningDecisionProjection, setRunningDecisionProjection] = useState(false);
@@ -1156,6 +1165,23 @@ function ProductsView({
     setCategoryFilter('ALL');
     setSeoReadyOnly(false);
     setFeedback({ tone: 'info', message: '\uC0C1\uD488 \uD544\uD130\uB97C \uCD08\uAE30\uD654\uD588\uC2B5\uB2C8\uB2E4.' });
+  }
+
+  async function handleDeleteProductClick(product: Product) {
+    const confirmed = window.confirm(product.currentTitle + ' \uC0C1\uD488\uC744 \uCD94\uC801 \uBAA9\uB85D\uC5D0\uC11C \uC0AD\uC81C\uD558\uC2DC\uACA0\uC2B5\uB2C8\uAE4C? (\uB124\uC774\uBC84 \uC2E4\uC81C \uC0C1\uD488\uC5D0\uB294 \uC601\uD5A5\uC744 \uC8FC\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4)');
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setDeletingProductId(product.id);
+      await onDeleteProduct(product.id);
+      setFeedback({ tone: 'success', message: product.currentTitle + ' \uC0C1\uD488\uC744 \uC0AD\uC81C\uD588\uC2B5\uB2C8\uB2E4.' });
+    } catch (error) {
+      setFeedback({ tone: 'error', message: error instanceof Error ? error.message : '\uC0C1\uD488 \uC0AD\uC81C\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4.' });
+    } finally {
+      setDeletingProductId(null);
+    }
   }
 
   function handleStartSeoPendingReview() {
@@ -1410,23 +1436,34 @@ function ProductsView({
         </div>
         <DataGrid
           columns={[
-            { key: 'smartStoreProductId', title: 'ID', width: 160, sticky: true },
+            {
+              key: 'actions',
+              title: '관리',
+              width: 130,
+              sticky: true,
+              render: (row) => (
+                <div className="inline-actions">
+                  <button type="button" className="action-button secondary" onClick={() => setSelectedDetailProductId(row.id)}>
+                    수정
+                  </button>
+                  <button
+                    type="button"
+                    className="action-button secondary"
+                    onClick={() => void handleDeleteProductClick(row)}
+                    disabled={deletingProductId === row.id}
+                  >
+                    삭제
+                  </button>
+                </div>
+              )
+            },
+            { key: 'smartStoreProductId', title: 'ID', width: 160 },
             { key: 'currentTitle', title: '현재 상품명', width: 300 },
             { key: 'seoOptimizedTitle', title: 'SEO 상품명', width: 320 },
             { key: 'primaryKeyword', title: '키워드', width: 160 },
             { key: 'trackingKeywords', title: '추적 키워드', width: 220, render: (row) => row.trackingKeywords.join(', ') },
             { key: 'price', title: '가격', width: 110 },
-            { key: 'testStatus', title: '상태', width: 120, render: (row) => <StatusBadge value={row.testStatus} /> },
-            {
-              key: 'actions',
-              title: '상세',
-              width: 120,
-              render: (row) => (
-                <button type="button" className="action-button secondary" onClick={() => setSelectedDetailProductId(row.id)}>
-                  상세 보기
-                </button>
-              )
-            }
+            { key: 'testStatus', title: '상태', width: 120, render: (row) => <StatusBadge value={row.testStatus} /> }
           ]}
           rows={paginatedProducts}
         />

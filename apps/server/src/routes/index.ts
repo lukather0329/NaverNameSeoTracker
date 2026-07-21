@@ -302,6 +302,28 @@ router.put("/products/:id", async (req, res) => {
   });
 });
 
+router.delete("/products/:id", async (req, res) => {
+  const product = await prisma.product.findUnique({ where: { id: req.params.id } });
+
+  if (!product) {
+    res.status(404).json({ ok: false, message: "상품을 찾을 수 없습니다." });
+    return;
+  }
+
+  await prisma.product.delete({ where: { id: req.params.id } });
+
+  await prisma.systemLog.create({
+    data: {
+      level: "INFO",
+      scope: "product-delete",
+      message: `${product.currentTitle} 추적 상품을 목록에서 제거했습니다.`,
+      metaJson: JSON.stringify({ productId: product.id, smartStoreProductId: product.smartStoreProductId })
+    }
+  });
+
+  res.json({ ok: true });
+});
+
 router.post("/products/:id/decision-projection", async (req, res) => {
   const input = productDecisionProjectionSchema.parse(req.body ?? {});
   const productRecord = await prisma.product.findUnique({ where: { id: req.params.id } });

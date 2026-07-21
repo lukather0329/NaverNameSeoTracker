@@ -40,6 +40,7 @@ model Product {
   price                Int
   productStatus        String            @default("ON_SALE")
   testStatus           String            @default("DRAFT")
+  apiAccountId         String?
   createdAt            DateTime          @default(now())
   updatedAt            DateTime          @updatedAt
   titleCandidates      SeoTitleCandidate[]

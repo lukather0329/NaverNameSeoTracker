@@ -202,6 +202,18 @@ export async function updateProduct(productId: string, input: UpdateProductInput
   return response.json();
 }
 
+export async function deleteProduct(productId: string) {
+  const response = await fetch(`${API_BASE_URL}/products/${productId}`, {
+    method: "DELETE"
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to delete product");
+  }
+
+  return response.json();
+}
+
 export async function runDecisionProjection(productId: string, input: DecisionProjectionInput): Promise<DecisionProjectionResponse> {
   const response = await fetch(`${API_BASE_URL}/products/${productId}/decision-projection`, {
     method: "POST",

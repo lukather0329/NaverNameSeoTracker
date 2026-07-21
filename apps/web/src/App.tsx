@@ -12,7 +12,7 @@ import type {
   TitleChangeLog
 } from "@naver-seo-tracker/shared";
 import { DataGrid } from "./components/DataGrid";
-import type { DecisionProjectionResponse, ProductImportResponse } from "./lib/api";
+import type { DecisionProjectionResponse, ProductImportResponse, PublishTitleResponse } from "./lib/api";
 import { SparklineBars } from "./components/SparklineBars";
 import { StatusBadge } from "./components/StatusBadge";
 import {
@@ -21,6 +21,7 @@ import {
   deleteProduct,
   fetchSnapshot,
   importCommerceProducts,
+  publishProductTitleToNaver,
   runDecisionProjection,
   runTrackingJob,
   testApiAccountConnection,
@@ -272,6 +273,12 @@ export function App() {
     await loadSnapshot();
   }
 
+  async function handlePublishProductTitle(productId: string) {
+    const result = await publishProductTitleToNaver(productId);
+    await loadSnapshot();
+    return result;
+  }
+
   async function handleRunDecisionProjection(productId: string, input: { seoTitle?: string; primaryKeyword?: string; trackingKeywords?: string[]; targetRank?: number; iterations?: number; seed?: number; horizonDays?: number }) {
     return runDecisionProjection(productId, input);
   }
@@ -320,7 +327,7 @@ export function App() {
                 onToggleAccount={handleToggleApiAccount}
               />
             )}
-            {view === "products" && <ProductsView products={snapshot.products} experiments={snapshot.experiments} titleChangeLogs={snapshot.titleChangeLogs} apiAccounts={snapshot.apiAccounts} systemLogs={snapshot.systemLogs ?? []} onImportProducts={handleImportCommerceProducts} onCreateExperimentDraft={handleCreateExperimentDraft} onUpdateProduct={handleUpdateProduct} onDeleteProduct={handleDeleteProduct} onRunDecisionProjection={handleRunDecisionProjection} onOpenExperimentsView={handleOpenExperimentsView} />}
+            {view === "products" && <ProductsView products={snapshot.products} experiments={snapshot.experiments} titleChangeLogs={snapshot.titleChangeLogs} apiAccounts={snapshot.apiAccounts} systemLogs={snapshot.systemLogs ?? []} onImportProducts={handleImportCommerceProducts} onCreateExperimentDraft={handleCreateExperimentDraft} onUpdateProduct={handleUpdateProduct} onDeleteProduct={handleDeleteProduct} onPublishProductTitle={handlePublishProductTitle} onRunDecisionProjection={handleRunDecisionProjection} onOpenExperimentsView={handleOpenExperimentsView} />}
             {view === "experiments" && <ExperimentsView experiments={snapshot.experiments} focusExperimentId={focusExperimentId} />}
             {view === "tracking" && <TrackingJobsView jobs={snapshot.jobs} onRunJob={handleRunJob} />}
             {view === "results" && <ResultsView results={snapshot.results} products={snapshot.products} />}
@@ -946,6 +953,7 @@ function ProductsView({
   onCreateExperimentDraft,
   onUpdateProduct,
   onDeleteProduct,
+  onPublishProductTitle,
   onRunDecisionProjection,
   onOpenExperimentsView
 }: {
@@ -958,12 +966,14 @@ function ProductsView({
   onCreateExperimentDraft: (product: Product) => Promise<void>;
   onUpdateProduct: (productId: string, input: { seoOptimizedTitle?: string; primaryKeyword?: string; trackingKeywords?: string[] }) => Promise<void>;
   onDeleteProduct: (productId: string) => Promise<void>;
+  onPublishProductTitle: (productId: string) => Promise<PublishTitleResponse>;
   onRunDecisionProjection: (productId: string, input: { seoTitle?: string; primaryKeyword?: string; trackingKeywords?: string[]; targetRank?: number; iterations?: number; seed?: number; horizonDays?: number }) => Promise<DecisionProjectionResponse>;
   onOpenExperimentsView: () => void;
 }) {
   const [importing, setImporting] = useState(false);
   const [creatingExperimentId, setCreatingExperimentId] = useState('');
   const [savingProductDetail, setSavingProductDetail] = useState(false);
+  const [publishingTitle, setPublishingTitle] = useState(false);
   const [feedback, setFeedback] = useState<{ tone: FeedbackTone; message: string } | null>(null);
   const [selectedImportAccountId, setSelectedImportAccountId] = useState('');
   const [productSearchQuery, setProductSearchQuery] = useState('');
@@ -1229,6 +1239,37 @@ function ProductsView({
       setFeedback({ tone: 'error', message: error instanceof Error ? error.message : '\uC0C1\uD488 SEO \uC815\uBCF4 \uC800\uC7A5\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4.' });
     } finally {
       setSavingProductDetail(false);
+    }
+  }
+
+  async function handlePublishTitleClick() {
+    if (!selectedDetailProduct) {
+      return;
+    }
+
+    const seoTitle = detailForm.seoOptimizedTitle.trim();
+
+    if (!seoTitle) {
+      setFeedback({ tone: 'warning', message: 'SEO 상품명을 먼저 입력해 주세요.' });
+      return;
+    }
+
+    const confirmed = window.confirm('네이버 실제 상품명을 "' + seoTitle + '"로 변경합니다. 실제 라이브 상품에 반영되며 되돌릴 수 없습니다. 계속하시겠습니까?');
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setPublishingTitle(true);
+      const result = await onPublishProductTitle(selectedDetailProduct.id);
+      setFeedback({ tone: 'success', message: '네이버 상품명을 "' + result.newName + '"(으)로 반영했습니다.' });
+      window.alert('[성공] 네이버 상품명을 반영했습니다: ' + result.newName);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '네이버 상품명 반영에 실패했습니다.';
+      setFeedback({ tone: 'error', message });
+      window.alert('[실패] ' + message);
+    } finally {
+      setPublishingTitle(false);
     }
   }
 
@@ -1514,6 +1555,9 @@ function ProductsView({
               </button>
               <button type="button" className="action-button" onClick={() => void handleSaveProductDetail()} disabled={savingProductDetail}>
                 {savingProductDetail ? '\uC800\uC7A5 \uC911...' : '\uC0C1\uD488 SEO \uC800\uC7A5'}
+              </button>
+              <button type="button" className="action-button" onClick={() => void handlePublishTitleClick()} disabled={publishingTitle || !detailForm.seoOptimizedTitle.trim()} title="SEO \uC0C1\uD488\uBA85\uC744 \uB124\uC774\uBC84 \uC2E4\uC81C \uC0C1\uD488\uBA85\uC73C\uB85C \uBC18\uC601\uD569\uB2C8\uB2E4.">
+                {publishingTitle ? '\uBC18\uC601 \uC911...' : '\uC2A4\uB9C8\uD2B8\uC2A4\uD1A0\uC5B4 \uC804\uC1A1'}
               </button>
             </div>
           </div>

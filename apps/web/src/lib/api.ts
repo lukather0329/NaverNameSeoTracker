@@ -214,6 +214,27 @@ export async function deleteProduct(productId: string) {
   return response.json();
 }
 
+export type PublishTitleResponse = {
+  ok: boolean;
+  message: string;
+  previousName: string | null;
+  newName: string;
+};
+
+export async function publishProductTitleToNaver(productId: string): Promise<PublishTitleResponse> {
+  const response = await fetch(`${API_BASE_URL}/products/${productId}/publish-title`, {
+    method: "POST"
+  });
+
+  const payload = (await response.json().catch(() => null)) as PublishTitleResponse | { ok?: boolean; message?: string } | null;
+
+  if (!response.ok || !payload?.ok) {
+    throw new Error(payload?.message ?? "네이버 상품명 반영에 실패했습니다.");
+  }
+
+  return payload as PublishTitleResponse;
+}
+
 export async function runDecisionProjection(productId: string, input: DecisionProjectionInput): Promise<DecisionProjectionResponse> {
   const response = await fetch(`${API_BASE_URL}/products/${productId}/decision-projection`, {
     method: "POST",

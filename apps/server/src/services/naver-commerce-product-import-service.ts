@@ -201,7 +201,7 @@ export async function importProductsFromCommerceAccount(account: CommerceApiAcco
   };
 }
 
-async function issueSellerAccessToken(clientId: string, clientSecret: string, sellerIdentifier: string) {
+export async function issueSellerAccessToken(clientId: string, clientSecret: string, sellerIdentifier: string) {
   const timestamp = Date.now().toString();
   const signature = Buffer.from(bcrypt.hashSync(`${clientId}_${timestamp}`, clientSecret), "utf8").toString("base64");
   const body = new URLSearchParams({
@@ -310,7 +310,7 @@ function normalizeNullableString(value: string | null | undefined) {
   return normalized ? normalized : null;
 }
 
-async function buildCommerceErrorMessage(response: Response, fallbackMessage: string) {
+export async function buildCommerceErrorMessage(response: Response, fallbackMessage: string) {
   const text = await response.text();
 
   if (!text) {

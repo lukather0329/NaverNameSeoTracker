@@ -6,6 +6,7 @@ import { getDashboardSummary } from "../services/dashboard-service.js";
 import { runDecisionProjection } from "../services/decision-engine-service.js";
 import { testNaverApiConnection } from "../services/naver-api-test-service.js";
 import { importProductsFromCommerceAccount } from "../services/naver-commerce-product-import-service.js";
+import { publishProductTitleToNaver } from "../services/naver-product-publish-service.js";
 import { runTrackingJob } from "../services/rank-tracking-service.js";
 
 const router = Router();
@@ -322,6 +323,77 @@ router.delete("/products/:id", async (req, res) => {
   });
 
   res.json({ ok: true });
+});
+
+router.post("/products/:id/publish-title", async (req, res) => {
+  const product = await prisma.product.findUnique({ where: { id: req.params.id } });
+
+  if (!product) {
+    res.status(404).json({ ok: false, message: "상품을 찾을 수 없습니다." });
+    return;
+  }
+
+  try {
+    const result = await publishProductTitleToNaver(product);
+
+    const updated = await prisma.product.update({
+      where: { id: product.id },
+      data: { currentTitle: result.newName }
+    });
+
+    await prisma.titleChangeLog.create({
+      data: {
+        productId: product.id,
+        beforeTitle: result.previousName ?? product.currentTitle,
+        afterTitle: result.newName,
+        appliedAt: new Date(),
+        mode: "REAL",
+        result: "SUCCESS"
+      }
+    });
+
+    await prisma.systemLog.create({
+      data: {
+        level: "INFO",
+        scope: "product-publish",
+        message: `${result.newName} 상품명을 네이버에 반영했습니다.`,
+        metaJson: JSON.stringify({ productId: product.id, previousName: result.previousName, newName: result.newName })
+      }
+    });
+
+    res.json({
+      ok: true,
+      message: "네이버 상품명을 반영했습니다.",
+      previousName: result.previousName,
+      newName: result.newName,
+      product: { ...updated, trackingKeywords: updated.trackingKeywords.split(",").filter(Boolean) }
+    });
+  } catch (caught) {
+    const message = caught instanceof Error ? caught.message : "네이버 상품명 반영 중 알 수 없는 오류가 발생했습니다.";
+
+    await prisma.titleChangeLog.create({
+      data: {
+        productId: product.id,
+        beforeTitle: product.currentTitle,
+        afterTitle: product.seoOptimizedTitle ?? product.currentTitle,
+        appliedAt: new Date(),
+        mode: "REAL",
+        result: "FAILED",
+        reason: message
+      }
+    });
+
+    await prisma.systemLog.create({
+      data: {
+        level: "ERROR",
+        scope: "product-publish",
+        message: `${product.currentTitle} 상품명 네이버 반영 실패`,
+        metaJson: JSON.stringify({ productId: product.id, details: message })
+      }
+    });
+
+    res.status(502).json({ ok: false, message });
+  }
 });
 
 router.post("/products/:id/decision-projection", async (req, res) => {

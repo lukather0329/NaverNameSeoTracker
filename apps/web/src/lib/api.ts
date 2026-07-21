@@ -38,6 +38,7 @@ export type ProductImportResponse = {
   importedCount: number;
   createdCount: number;
   updatedCount: number;
+  unchangedCount: number;
   skippedCount: number;
   pageCount: number;
 };

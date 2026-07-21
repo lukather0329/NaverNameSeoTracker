@@ -60,9 +60,33 @@ export type CommerceProductImportResult = {
   importedCount: number;
   createdCount: number;
   updatedCount: number;
+  unchangedCount: number;
   skippedCount: number;
   pageCount: number;
 };
+
+function hasProductChanged(
+  existing: {
+    originProductId: string | null;
+    channelProductId: string | null;
+    sellerManagementCode: string | null;
+    currentTitle: string;
+    category: string | null;
+    price: number;
+    productStatus: string;
+  },
+  next: ImportedCommerceProduct
+) {
+  return (
+    existing.originProductId !== next.originProductId ||
+    existing.channelProductId !== next.channelProductId ||
+    existing.sellerManagementCode !== next.sellerManagementCode ||
+    existing.currentTitle !== next.currentTitle ||
+    existing.category !== next.category ||
+    existing.price !== next.price ||
+    existing.productStatus !== next.productStatus
+  );
+}
 
 export async function importProductsFromCommerceAccount(account: CommerceApiAccount): Promise<CommerceProductImportResult> {
   if (account.type !== "COMMERCE") {
@@ -84,6 +108,7 @@ export async function importProductsFromCommerceAccount(account: CommerceApiAcco
 
   let createdCount = 0;
   let updatedCount = 0;
+  let unchangedCount = 0;
   let skippedCount = 0;
 
   await prisma.$transaction(async (tx) => {
@@ -98,6 +123,11 @@ export async function importProductsFromCommerceAccount(account: CommerceApiAcco
       });
 
       if (existing) {
+        if (!hasProductChanged(existing, product)) {
+          unchangedCount += 1;
+          continue;
+        }
+
         await tx.product.update({
           where: { id: existing.id },
           data: {
@@ -146,6 +176,7 @@ export async function importProductsFromCommerceAccount(account: CommerceApiAcco
         totalFetched: remoteProducts.length,
         createdCount,
         updatedCount,
+        unchangedCount,
         skippedCount
       })
     }
@@ -159,6 +190,7 @@ export async function importProductsFromCommerceAccount(account: CommerceApiAcco
     importedCount: createdCount + updatedCount,
     createdCount,
     updatedCount,
+    unchangedCount,
     skippedCount,
     pageCount: Math.max(1, Math.ceil(remoteProducts.length / PRODUCT_PAGE_SIZE))
   };

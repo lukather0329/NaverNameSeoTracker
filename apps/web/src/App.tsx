@@ -997,7 +997,7 @@ function ProductsView({
     {
       label: '\uC2E0\uADDC / \uC5C5\uB370\uC774\uD2B8',
       value: lastImportResult ? `${lastImportResult.createdCount} / ${lastImportResult.updatedCount}` : '- / -',
-      caption: lastImportResult ? '\uC81C\uC678 ' + lastImportResult.skippedCount + '\uAC1C \uD3EC\uD568' : '\uC2E0\uADDC \uC0DD\uC131 \uBC0F \uAE30\uC874 \uC0C1\uD488 \uAC31\uC2E0 \uC218'
+      caption: lastImportResult ? '\uBCC0\uACBD\uC5C6\uC74C ' + lastImportResult.unchangedCount + '\uAC1C \u00B7 \uC81C\uC678 ' + lastImportResult.skippedCount + '\uAC1C' : '\uC2E0\uADDC \uC0DD\uC131 \uBC0F \uAE30\uC874 \uC0C1\uD488 \uAC31\uC2E0 \uC218'
     },
     {
       label: '\uCD5C\uADFC \uB85C\uADF8',
@@ -1130,7 +1130,7 @@ function ProductsView({
       setCategoryFilter('ALL');
       setSeoReadyOnly(false);
       setFocusSeoPendingAfterImport(true);
-      setFeedback({ tone: 'success', message: '\uB3D9\uAE30\uD654 \uC644\uB8CC: \uC2A4\uD1A0\uC5B4 ' + result.sellerIdentifier + ' / \uC870\uD68C ' + result.totalFetched + '\uAC1C / \uBC18\uC601 ' + result.importedCount + '\uAC1C / \uC2E0\uADDC ' + result.createdCount + '\uAC1C / \uC5C5\uB370\uC774\uD2B8 ' + result.updatedCount + '\uAC1C / \uC81C\uC678 ' + result.skippedCount + '\uAC1C' });
+      setFeedback({ tone: 'success', message: '\uB3D9\uAE30\uD654 \uC644\uB8CC: \uC2A4\uD1A0\uC5B4 ' + result.sellerIdentifier + ' / \uC870\uD68C ' + result.totalFetched + '\uAC1C / \uBC18\uC601 ' + result.importedCount + '\uAC1C / \uC2E0\uADDC ' + result.createdCount + '\uAC1C / \uC5C5\uB370\uC774\uD2B8 ' + result.updatedCount + '\uAC1C / \uBCC0\uACBD\uC5C6\uC74C ' + result.unchangedCount + '\uAC1C / \uC81C\uC678 ' + result.skippedCount + '\uAC1C' });
     } catch (error) {
       setFeedback({ tone: 'error', message: error instanceof Error ? error.message : '\uC2A4\uB9C8\uD2B8\uC2A4\uD1A0\uC5B4 \uC0C1\uD488 \uBAA9\uB85D \uC870\uD68C\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4.' });
     } finally {

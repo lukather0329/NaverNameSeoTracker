@@ -1687,9 +1687,9 @@ function formatDecisionRecommendationStatus(value: DecisionProjectionResponse['p
 }
 
 function formatDecisionConfidence(value: DecisionProjectionResponse['projection']['confidence']) {
-  if (value === 'high') return '??';
-  if (value === 'medium') return '??';
-  return '??';
+  if (value === 'high') return '높음';
+  if (value === 'medium') return '보통';
+  return '낮음';
 }
 
 function ExperimentsView({ experiments, focusExperimentId }: { experiments: SeoExperiment[]; focusExperimentId?: string | null }) {

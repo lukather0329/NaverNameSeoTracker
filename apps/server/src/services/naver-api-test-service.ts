@@ -187,7 +187,7 @@ async function issueCommerceAccessToken(clientId: string, clientSecret: string, 
     timestamp,
     grant_type: "client_credentials",
     client_secret_sign: signature,
-    type: "SELLER",
+    type: "SELF",
     account_id: sellerIdentifier
   });
 

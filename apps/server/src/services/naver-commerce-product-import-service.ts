@@ -133,7 +133,7 @@ export async function importProductsFromCommerceAccount(account: CommerceApiAcco
         createdCount += 1;
       }
     }
-  });
+  }, { timeout: 30000 });
 
   await prisma.systemLog.create({
     data: {
@@ -172,7 +172,7 @@ async function issueSellerAccessToken(clientId: string, clientSecret: string, se
     timestamp,
     grant_type: "client_credentials",
     client_secret_sign: signature,
-    type: "SELLER",
+    type: "SELF",
     account_id: sellerIdentifier
   });
 

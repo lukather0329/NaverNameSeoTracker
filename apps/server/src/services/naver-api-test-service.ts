@@ -1,5 +1,5 @@
 ﻿import { createHmac } from "node:crypto";
-import bcrypt from "bcryptjs";
+import { issueSellerAccessToken } from "./naver-commerce-product-import-service.js";
 
 type StoredApiAccount = {
   type: string;
@@ -23,9 +23,9 @@ export type ApiConnectionTestResult = {
 const NAVER_SEARCH_AD_BASE_URL = "https://api.searchad.naver.com";
 const NAVER_SEARCH_AD_TEST_URI = "/ncc/campaigns";
 const NAVER_COMMERCE_BASE_URL = "https://api.commerce.naver.com/external";
-const NAVER_COMMERCE_TOKEN_ENDPOINT = `${NAVER_COMMERCE_BASE_URL}/v1/oauth2/token`;
 const NAVER_COMMERCE_PRODUCT_SEARCH_ENDPOINT = `${NAVER_COMMERCE_BASE_URL}/v1/products/search`;
 const NAVER_COMMERCE_PRODUCT_STATUS_TYPES = ["WAIT", "SALE", "OUTOFSTOCK", "UNADMISSION", "REJECTION", "SUSPENSION", "CLOSE", "PROHIBITION"];
+const NAVER_OPEN_API_SHOP_SEARCH_URL = "https://openapi.naver.com/v1/search/shop.json";
 
 export async function testNaverApiConnection(account: StoredApiAccount): Promise<ApiConnectionTestResult> {
   if (account.type === "SEARCH_AD") {
@@ -34,6 +34,10 @@ export async function testNaverApiConnection(account: StoredApiAccount): Promise
 
   if (account.type === "COMMERCE") {
     return testCommerceConnection(account);
+  }
+
+  if (account.type === "SHOPPING_SEARCH") {
+    return testShoppingSearchConnection(account);
   }
 
   return account.clientId && account.clientSecret
@@ -105,6 +109,54 @@ async function testSearchAdConnection(account: StoredApiAccount): Promise<ApiCon
   }
 }
 
+async function testShoppingSearchConnection(account: StoredApiAccount): Promise<ApiConnectionTestResult> {
+  if (!account.clientId.trim() || !account.clientSecret.trim()) {
+    return {
+      ok: false,
+      mode: "validation",
+      message: "쇼핑검색 실테스트에는 오픈API 클라이언트 ID와 시크릿이 필요합니다."
+    };
+  }
+
+  try {
+    const response = await fetch(`${NAVER_OPEN_API_SHOP_SEARCH_URL}?query=${encodeURIComponent("테스트")}&display=1`, {
+      method: "GET",
+      headers: {
+        "X-Naver-Client-Id": account.clientId,
+        "X-Naver-Client-Secret": account.clientSecret
+      }
+    });
+
+    const bodyText = await response.text();
+    const details = bodyText.slice(0, 300);
+
+    if (response.ok) {
+      return {
+        ok: true,
+        mode: "real",
+        statusCode: response.status,
+        message: "네이버 오픈API 쇼핑검색 실연동 테스트에 성공했습니다.",
+        details
+      };
+    }
+
+    return {
+      ok: false,
+      mode: "real",
+      statusCode: response.status,
+      message: "네이버 오픈API 쇼핑검색 인증 또는 요청 오류가 반환되었습니다.",
+      details
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      mode: "real",
+      message: "네이버 오픈API 쇼핑검색 실연동 테스트 중 네트워크 오류가 발생했습니다.",
+      details: error instanceof Error ? error.message : "Unknown error"
+    };
+  }
+}
+
 async function testCommerceConnection(account: StoredApiAccount): Promise<ApiConnectionTestResult> {
   const sellerIdentifier = (account.channelId || account.storeId || "").trim();
 
@@ -125,7 +177,7 @@ async function testCommerceConnection(account: StoredApiAccount): Promise<ApiCon
   }
 
   try {
-    const accessToken = await issueCommerceAccessToken(account.clientId, account.clientSecret, sellerIdentifier);
+    const accessToken = await issueSellerAccessToken(account.clientId, account.clientSecret, sellerIdentifier);
     const productResponse = await fetch(NAVER_COMMERCE_PRODUCT_SEARCH_ENDPOINT, {
       method: "POST",
       headers: {
@@ -177,42 +229,6 @@ async function testCommerceConnection(account: StoredApiAccount): Promise<ApiCon
       details: error instanceof Error ? error.message : "Unknown error"
     };
   }
-}
-
-async function issueCommerceAccessToken(clientId: string, clientSecret: string, sellerIdentifier: string) {
-  const timestamp = Date.now().toString();
-  const signature = Buffer.from(bcrypt.hashSync(`${clientId}_${timestamp}`, clientSecret), "utf8").toString("base64");
-  const body = new URLSearchParams({
-    client_id: clientId,
-    timestamp,
-    grant_type: "client_credentials",
-    client_secret_sign: signature,
-    type: "SELF",
-    account_id: sellerIdentifier
-  });
-
-  const response = await fetch(NAVER_COMMERCE_TOKEN_ENDPOINT, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-      Accept: "application/json"
-    },
-    body
-  });
-
-  const responseText = await response.text();
-
-  if (!response.ok) {
-    throw new Error(await buildCommerceErrorMessageFromText(response.status, responseText, "커머스 인증 토큰 발급에 실패했습니다."));
-  }
-
-  const payload = JSON.parse(responseText) as { access_token?: string };
-
-  if (!payload.access_token) {
-    throw new Error("커머스 인증 토큰이 비어 있습니다.");
-  }
-
-  return payload.access_token;
 }
 
 async function buildCommerceErrorMessageFromText(statusCode: number, text: string, fallbackMessage: string) {

@@ -39,6 +39,7 @@ model Product {
   category             String?
   price                Int
   productStatus        String            @default("ON_SALE")
+  naverStatusType      String?
   testStatus           String            @default("DRAFT")
   apiAccountId         String?
   createdAt            DateTime          @default(now())
@@ -158,4 +159,15 @@ model SystemLog {
   metaJson  String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// 사용자가 추적 목록에서 삭제한 상품의 smartStoreProductId를 기록해 두는 블랙리스트.
+// 네이버에는 여전히 살아있는 상품이라 재동기화(스마트스토어 상품 불러오기)를 돌리면
+// 다시 생성되어 버리는 문제를 막기 위한 것. 여기 있는 동안은 신규 생성 대상에서 제외된다.
+model ExcludedProduct {
+  id                  String   @id @default(cuid())
+  smartStoreProductId String   @unique
+  reason              String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 }

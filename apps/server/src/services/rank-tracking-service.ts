@@ -1,11 +1,43 @@
-﻿import { prisma } from "../lib/prisma.js";
+﻿import { decryptSecret } from "../lib/crypto.js";
+import { prisma } from "../lib/prisma.js";
 import { MockRankProvider } from "../providers/mock-rank-provider.js";
 import { NaverShoppingRankProvider } from "../providers/naver-shopping-rank-provider.js";
 import type { RankProvider } from "../providers/rank-provider.js";
 
-function resolveProvider(provider: string): RankProvider {
+// 활성화된 쇼핑검색(오픈API) 계정을 찾아 자격증명을 복호화해서 돌려준다.
+// 계정이 여러 개면 가장 최근에 등록된 것을 사용한다 — 계정별로 실험을 나눠 쓰는
+// 구조가 아니라, 스토어 하나당 쇼핑검색 오픈API 앱은 보통 하나면 충분하기 때문이다.
+export async function findActiveShoppingSearchCredentials(): Promise<{ clientId: string; clientSecret: string } | null> {
+  const account = await prisma.apiAccount.findFirst({
+    where: { type: "SHOPPING_SEARCH", isActive: true },
+    orderBy: { createdAt: "desc" }
+  });
+
+  if (!account) {
+    return null;
+  }
+
+  const clientId = account.clientId.trim();
+  const clientSecret = decryptSecret(account.clientSecret) ?? "";
+
+  if (!clientId || !clientSecret) {
+    return null;
+  }
+
+  return { clientId, clientSecret };
+}
+
+async function resolveProvider(provider: string): Promise<RankProvider> {
   if (provider === "NAVER_SHOPPING") {
-    return new NaverShoppingRankProvider();
+    const credentials = await findActiveShoppingSearchCredentials();
+
+    if (!credentials) {
+      throw new Error(
+        "네이버 오픈API 쇼핑검색 계정이 없거나 비활성 상태입니다. API 계정 관리에서 쇼핑검색 계정을 등록/활성화하세요."
+      );
+    }
+
+    return new NaverShoppingRankProvider(credentials.clientId, credentials.clientSecret);
   }
 
   return new MockRankProvider();
@@ -23,11 +55,13 @@ export async function runTrackingJob(jobId: string) {
     return null;
   }
 
-  const provider = resolveProvider(job.provider);
+  const provider = await resolveProvider(job.provider);
   const lookup = await provider.lookup({
     keyword: job.keyword,
     productId: job.productId,
-    currentTitle: job.product.currentTitle
+    currentTitle: job.product.currentTitle,
+    smartStoreProductId: job.product.smartStoreProductId,
+    originProductId: job.product.originProductId
   });
 
   const previous = await prisma.rankTrackingResult.findFirst({

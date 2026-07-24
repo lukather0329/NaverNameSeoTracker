@@ -11,9 +11,11 @@
     "dev:server": "npm --workspace @naver-seo-tracker/server run dev",
     "dev:web": "npm --workspace @naver-seo-tracker/web run dev",
     "build": "npm run build --workspaces",
+    "start": "npm --workspace @naver-seo-tracker/server run start",
     "lint": "npm run lint --workspaces",
     "prisma:generate": "npm --workspace @naver-seo-tracker/server run prisma:generate",
     "prisma:migrate": "npm --workspace @naver-seo-tracker/server run prisma:migrate",
+    "prisma:migrate:deploy": "npm --workspace @naver-seo-tracker/server run prisma:migrate:deploy",
     "prisma:seed": "npm --workspace @naver-seo-tracker/server run prisma:seed"
   },
   "devDependencies": {

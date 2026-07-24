@@ -197,6 +197,12 @@ select {
   box-shadow: none;
 }
 
+.action-button.danger {
+  color: #ffffff;
+  background: #ff4757;
+  box-shadow: 0 12px 24px rgba(255, 71, 87, 0.28);
+}
+
 
 .action-button:disabled {
   cursor: not-allowed;
@@ -390,6 +396,53 @@ select {
   margin: 0;
   color: var(--text-main);
   line-height: 1.6;
+}
+
+.rank-trend-card {
+  margin-bottom: 18px;
+}
+
+.rank-trend-card .section-heading {
+  align-items: center;
+}
+
+.rank-trend-chart {
+  width: 100%;
+  height: 220px;
+  display: block;
+}
+
+.rank-trend-axis-label {
+  font-size: 10px;
+  fill: var(--text-soft);
+}
+
+.rank-trend-out-label {
+  fill: #ff4757;
+}
+
+.experiment-settings-card {
+  margin-top: 18px;
+  display: grid;
+  gap: 14px;
+}
+
+.product-detail-item select {
+  width: 100%;
+  padding: 12px 14px;
+  font: inherit;
+  color: var(--text-main);
+  border: 1px solid rgba(224, 229, 250, 0.96);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.98);
+}
+
+.success-text {
+  color: #12b76a;
+}
+
+.error-text {
+  color: #ff4757;
 }
 
 .experiment-filter-actions {
@@ -629,6 +682,12 @@ select {
   accent-color: #7551ff;
 }
 
+.checkbox-field.inline-checkbox {
+  min-height: auto;
+  align-self: center;
+  padding: 0;
+}
+
 .inline-actions {
   display: flex;
   gap: 10px;
@@ -640,7 +699,11 @@ select {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
-  min-width: 170px;
+  /* 컬럼의 실제 너비(DataGrid columns의 width)가 유일한 기준이 되어야 한다.
+     여기서 min-width를 크게 강제하면 컬럼 width보다 이 값이 커질 때 버튼이
+     옆 컬럼 위로 넘쳐 보이는(overlap) 문제가 생긴다. */
+  min-width: 0;
+  max-width: 100%;
 }
 
 .grid-cell .action-button {
@@ -911,10 +974,114 @@ select {
   white-space: nowrap;
 }
 
+.grid-cell.wrap {
+  align-items: flex-start;
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
+.grid-cell-content.wrap {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  word-break: break-word;
+  line-height: 1.4;
+}
+
+.inline-edit-cell {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 4px 6px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-main);
+  font-family: "Nanum Gothic", "NanumGothic", 굴림, Gulim, sans-serif;
+  font-size: 13px;
+  line-height: 1.4;
+  resize: none;
+}
+
+.inline-edit-cell:hover {
+  border-color: rgba(117, 81, 255, 0.28);
+  background: rgba(117, 81, 255, 0.04);
+}
+
+.inline-edit-cell:focus {
+  outline: none;
+  border-color: #7551ff;
+  background: #ffffff;
+}
+
+.inline-edit-cell:disabled {
+  opacity: 0.6;
+}
+
 .grid-cell.sticky {
   position: sticky;
   z-index: 4;
   background: inherit;
+}
+
+.grid-select-cell {
+  justify-content: center;
+  padding: 6px 4px;
+}
+
+.grid-select-cell input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.grid-row.selected {
+  background: rgba(117, 81, 255, 0.1);
+}
+
+.grid-row.selected:nth-child(even) {
+  background: rgba(117, 81, 255, 0.14);
+}
+
+.bulk-action-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 16px;
+  margin-bottom: 10px;
+  border-radius: 14px;
+  background: rgba(255, 71, 87, 0.08);
+  border: 1px solid rgba(255, 71, 87, 0.24);
+}
+
+.excluded-product-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.excluded-product-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: rgba(148, 163, 184, 0.08);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.excluded-product-id {
+  font-weight: 600;
+}
+
+.excluded-product-reason {
+  flex: 1;
+  color: var(--text-muted, #94a3b8);
+  font-size: 0.85rem;
 }
 
 .resize-handle {
@@ -923,6 +1090,25 @@ select {
   width: 14px;
   cursor: col-resize;
   background: transparent;
+  z-index: 6;
+  touch-action: none;
+}
+
+.resize-handle::after {
+  content: "";
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  right: 5px;
+  width: 3px;
+  border-radius: 2px;
+  background: rgba(117, 81, 255, 0.18);
+  transition: background 0.12s ease;
+}
+
+.resize-handle:hover::after,
+.resize-handle:focus-visible::after {
+  background: rgba(117, 81, 255, 0.65);
 }
 
 .status-badge {
@@ -1274,6 +1460,16 @@ select {
   font-weight: 700;
   cursor: pointer;
   padding: 0;
+  text-decoration: none;
+}
+
+/* 화면 전체에서 링크(a 태그) 텍스트에 밑줄이 붙지 않도록 한다. */
+a {
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: none;
 }
 
 
@@ -1297,7 +1493,8 @@ select {
   justify-items: end;
 }
 
-.page-size-field select {
+.page-size-field select,
+.page-size-field input {
   min-height: 34px;
   padding: 4px 10px;
   font-size: 13px;
@@ -1319,6 +1516,47 @@ select {
 .pagination-bar .inline-actions {
   align-items: center;
   gap: 12px;
+}
+
+.page-number-list {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.page-number-button {
+  min-width: 30px;
+  height: 30px;
+  padding: 0 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(224, 229, 250, 0.96);
+  background: #ffffff;
+  color: var(--text-soft);
+  font-family: "Nanum Gothic", "NanumGothic", 굴림, Gulim, sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    border-color 160ms ease,
+    color 160ms ease,
+    background 160ms ease;
+}
+
+.page-number-button:hover:not(:disabled) {
+  border-color: rgba(117, 81, 255, 0.5);
+  color: #4318ff;
+}
+
+.page-number-button.active {
+  border-color: #7551ff;
+  color: #4318ff;
+  background: rgba(117, 81, 255, 0.08);
+}
+
+.page-number-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
 }
 
 .product-filter-actions {

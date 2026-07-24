@@ -1,4 +1,5 @@
 import { prisma } from "../lib/prisma.js";
+import { decryptSecret } from "../lib/crypto.js";
 import { buildCommerceErrorMessage, issueSellerAccessToken } from "./naver-commerce-product-import-service.js";
 
 const NAVER_COMMERCE_ORIGIN_PRODUCT_ENDPOINT = "https://api.commerce.naver.com/external/v2/products/origin-products";
@@ -43,7 +44,8 @@ export async function publishProductTitleToNaver(product: PublishableProduct): P
     throw new Error("계정에 스토어 ID 또는 채널 ID가 없습니다.");
   }
 
-  const accessToken = await issueSellerAccessToken(account.clientId, account.clientSecret, sellerIdentifier);
+  const clientSecret = decryptSecret(account.clientSecret) ?? account.clientSecret;
+  const accessToken = await issueSellerAccessToken(account.clientId, clientSecret, sellerIdentifier);
   const url = `${NAVER_COMMERCE_ORIGIN_PRODUCT_ENDPOINT}/${product.originProductId}`;
 
   const getResponse = await fetch(url, {

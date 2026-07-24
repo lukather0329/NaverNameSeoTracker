@@ -84,7 +84,7 @@ async function main() {
       beforeTitle: "Premium Tumbler 900ml",
       afterTitle: "Naver SEO Test Premium Tumbler 900ml Large Capacity Insulated Bottle",
       appliedAt: new Date(),
-      trackingInterval: "30_MINUTES",
+      trackingInterval: "30",
       startDate: new Date(),
       status: "RUNNING",
       summary: "Initial seeded experiment",
@@ -107,7 +107,7 @@ async function main() {
       experimentId: experiment.id,
       productId: product.id,
       keyword: "insulated tumbler",
-      interval: "30_MINUTES",
+      interval: "30",
       provider: "MOCK",
       isEnabled: true,
       status: "RUNNING"

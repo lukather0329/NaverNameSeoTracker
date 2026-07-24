@@ -1,4 +1,4 @@
-﻿import type { ApiAccountFormInput, AppSnapshot } from "@naver-seo-tracker/shared";
+﻿import type { ApiAccountFormInput, AppSnapshot, RankTrackingResult, SeoExperiment } from "@naver-seo-tracker/shared";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:4300/api";
 
@@ -15,11 +15,13 @@ export type CreateExperimentDraftInput = {
   productId: string;
   beforeTitle: string;
   afterTitle: string;
-  trackingInterval: "30_MINUTES" | "60_MINUTES";
+  trackingInterval: string;
   startDate: string;
   endDate?: string;
   minObservationHours?: number;
   notes?: string;
+  primaryKeyword?: string;
+  trackingKeywords?: string[];
 };
 
 export type UpdateProductInput = {
@@ -40,7 +42,9 @@ export type ProductImportResponse = {
   updatedCount: number;
   unchangedCount: number;
   skippedCount: number;
+  excludedCount?: number;
   pageCount: number;
+  forceResync?: boolean;
 };
 
 export type DecisionProjectionInput = {
@@ -96,16 +100,24 @@ export async function fetchSnapshot(): Promise<AppSnapshot> {
   return response.json();
 }
 
-export async function runTrackingJob(jobId: string) {
+export type RunTrackingJobResponse = {
+  ok: boolean;
+  message?: string;
+  result: RankTrackingResult | null;
+};
+
+export async function runTrackingJob(jobId: string): Promise<RunTrackingJobResponse> {
   const response = await fetch(`${API_BASE_URL}/jobs/${jobId}/run`, {
     method: "POST"
   });
 
-  if (!response.ok) {
-    throw new Error("Failed to run job");
+  const payload = (await response.json().catch(() => null)) as RunTrackingJobResponse | { ok?: boolean; message?: string } | null;
+
+  if (!response.ok || payload?.ok === false) {
+    throw new Error(payload?.message ?? "추적 작업 실행에 실패했습니다.");
   }
 
-  return response.json();
+  return payload as RunTrackingJobResponse;
 }
 
 export async function createApiAccount(input: ApiAccountFormInput) {
@@ -140,6 +152,20 @@ export async function updateApiAccount(accountId: string, input: Partial<ApiAcco
   return response.json();
 }
 
+export async function deleteApiAccount(accountId: string) {
+  const response = await fetch(`${API_BASE_URL}/accounts/${accountId}`, {
+    method: "DELETE"
+  });
+
+  const payload = (await response.json().catch(() => null)) as { ok?: boolean; message?: string } | null;
+
+  if (!response.ok || payload?.ok === false) {
+    throw new Error(payload?.message ?? "API 계정 삭제에 실패했습니다.");
+  }
+
+  return payload;
+}
+
 export async function testApiAccountConnection(accountId: string): Promise<ApiConnectionTestResponse> {
   const response = await fetch(`${API_BASE_URL}/accounts/${accountId}/test`, {
     method: "POST"
@@ -152,13 +178,16 @@ export async function testApiAccountConnection(accountId: string): Promise<ApiCo
   return response.json();
 }
 
-export async function importCommerceProducts(apiAccountId?: string): Promise<ProductImportResponse> {
+export async function importCommerceProducts(apiAccountId?: string, forceResync?: boolean): Promise<ProductImportResponse> {
   const response = await fetch(`${API_BASE_URL}/products/import/naver-commerce`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json"
     },
-    body: JSON.stringify(apiAccountId ? { apiAccountId } : {})
+    body: JSON.stringify({
+      ...(apiAccountId ? { apiAccountId } : {}),
+      ...(forceResync ? { forceResync: true } : {})
+    })
   });
 
   const payload = (await response.json().catch(() => null)) as ProductImportResponse | { ok?: boolean; message?: string } | null;
@@ -186,6 +215,38 @@ export async function createExperimentDraft(input: CreateExperimentDraftInput) {
   return response.json();
 }
 
+export type UpdateExperimentInput = {
+  trackingInterval?: string;
+  minObservationHours?: number;
+  notes?: string;
+  status?: "DRAFT" | "RUNNING" | "PAUSED" | "COMPLETED" | "FAILED";
+  endDate?: string;
+};
+
+export type UpdateExperimentResponse = SeoExperiment & {
+  createdJobCount?: number;
+  hasTrackingKeyword?: boolean;
+  usedMockProvider?: boolean;
+};
+
+export async function updateExperiment(experimentId: string, input: UpdateExperimentInput): Promise<UpdateExperimentResponse> {
+  const response = await fetch(`${API_BASE_URL}/experiments/${experimentId}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(input)
+  });
+
+  const payload = (await response.json().catch(() => null)) as UpdateExperimentResponse | { ok?: boolean; message?: string } | null;
+
+  if (!response.ok) {
+    throw new Error((payload as { message?: string } | null)?.message ?? "실험 설정 저장에 실패했습니다.");
+  }
+
+  return payload as UpdateExperimentResponse;
+}
+
 export async function updateProduct(productId: string, input: UpdateProductInput) {
   const response = await fetch(`${API_BASE_URL}/products/${productId}`, {
     method: "PUT",
@@ -209,6 +270,39 @@ export async function deleteProduct(productId: string) {
 
   if (!response.ok) {
     throw new Error("Failed to delete product");
+  }
+
+  return response.json();
+}
+
+export type BulkDeleteProductsResponse = {
+  ok: boolean;
+  deletedCount: number;
+};
+
+export async function bulkDeleteProducts(productIds: string[]): Promise<BulkDeleteProductsResponse> {
+  const response = await fetch(`${API_BASE_URL}/products/bulk-delete`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ ids: productIds })
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to bulk delete products");
+  }
+
+  return response.json();
+}
+
+export async function restoreExcludedProduct(id: string): Promise<{ ok: boolean }> {
+  const response = await fetch(`${API_BASE_URL}/excluded-products/${id}`, {
+    method: "DELETE"
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to restore excluded product");
   }
 
   return response.json();

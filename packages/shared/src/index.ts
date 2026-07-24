@@ -1,10 +1,36 @@
-export type ApiAccountType = "COMMERCE" | "SEARCH_AD" | "CUSTOM";
+export type ApiAccountType = "COMMERCE" | "SEARCH_AD" | "SHOPPING_SEARCH" | "CUSTOM";
 export type ConnectionStatus = "CONNECTED" | "FAILED" | "UNVERIFIED" | "EXPIRED";
 export type ProductStatus = "ON_SALE" | "PAUSED" | "SOLD_OUT";
 export type TestStatus = "DRAFT" | "RUNNING" | "PAUSED" | "COMPLETED" | "FAILED";
 export type RankDeltaStatus = "UP" | "DOWN" | "SAME" | "OUT";
 export type ExperimentJudgement = "EFFECTIVE" | "LOW_EFFECT" | "PENDING" | "WORSE";
-export type TrackingInterval = "30_MINUTES" | "60_MINUTES";
+// 추적 주기는 "분" 단위 숫자 문자열(예: "30", "180")로 저장한다.
+// 예전 데이터("30_MINUTES", "60_MINUTES")와의 호환을 위해 parseTrackingIntervalMinutes에서 함께 처리한다.
+export type TrackingInterval = string;
+
+export const TRACKING_INTERVAL_PRESETS_MINUTES = [30, 60, 180, 360, 720];
+
+export function parseTrackingIntervalMinutes(value: string): number {
+  const trimmed = (value ?? "").trim();
+  if (/^\d+$/.test(trimmed)) {
+    return Math.max(1, parseInt(trimmed, 10));
+  }
+  if (trimmed === "30_MINUTES") {
+    return 30;
+  }
+  if (trimmed === "60_MINUTES") {
+    return 60;
+  }
+  return 60;
+}
+
+export function formatTrackingIntervalLabel(value: string): string {
+  const minutes = parseTrackingIntervalMinutes(value);
+  if (minutes % 60 === 0) {
+    return `${minutes / 60}시간`;
+  }
+  return `${minutes}분`;
+}
 export type RankProviderKind = "MOCK" | "NAVER_SHOPPING" | "FUTURE_API";
 
 export interface ApiAccount {
@@ -53,6 +79,7 @@ export interface Product {
   category?: string | null;
   price: number;
   productStatus: ProductStatus;
+  naverStatusType?: string | null;
   testStatus: TestStatus;
   createdAt: string;
   updatedAt: string;
@@ -155,6 +182,14 @@ export interface SystemLogEntry {
   updatedAt: string;
 }
 
+export interface ExcludedProductEntry {
+  id: string;
+  smartStoreProductId: string;
+  reason?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface AppSnapshot {
   dashboard: DashboardSummary;
   apiAccounts: ApiAccount[];
@@ -165,4 +200,5 @@ export interface AppSnapshot {
   jobs: RankTrackingJob[];
   results: RankTrackingResult[];
   systemLogs: SystemLogEntry[];
+  excludedProducts: ExcludedProductEntry[];
 }

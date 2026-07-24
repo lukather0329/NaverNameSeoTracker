@@ -2,6 +2,8 @@ export interface RankLookupInput {
   keyword: string;
   productId: string;
   currentTitle: string;
+  smartStoreProductId?: string | null;
+  originProductId?: string | null;
 }
 
 export interface RankLookupResult {

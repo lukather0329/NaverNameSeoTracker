@@ -23,14 +23,25 @@
 
 ## 2. 다음에 확인/처리해야 할 것
 
-### 우선순위 높음
-- [ ] product-import-service.ts / naver-api-test-service.ts에 bcrypt 서명 로직이 중복되어 있음
-      (issueSellerAccessToken은 naver-commerce-product-import-service.ts에서 export해서 재사용 중이지만,
-       naver-api-test-service.ts의 testCommerceConnection 안에는 여전히 별도 복사본이 있음).
-      네이버 서명 방식이 바뀌면 두 곳 다 고쳐야 하니 하나로 합치는 게 좋음.
-- [ ] ApiAccountsView에서 React key 중복 경고 발생 중 ("검증 가능" 키 중복) - 콘솔에 계속 찍힘, 기능엔 영향 없지만 정리 필요
-- [ ] ENCRYPTION_SECRET 환경변수가 선언만 되어 있고 실제로 어디서도 안 씀 - API 계정 clientSecret이 DB에 평문 저장됨
-      (화면 표시용 마스킹만 되어 있음). 나중에 실제 서비스로 넘어가기 전에 암호화 필요.
+### 우선순위 높음 (Claude, 2026-07-22 낮 세션에서 처리 완료)
+- [x] product-import-service.ts / naver-api-test-service.ts bcrypt 서명 로직 중복 제거
+      naver-api-test-service.ts의 testCommerceConnection이 자체 보유하던 issueCommerceAccessToken(및 관련 상수
+      NAVER_COMMERCE_TOKEN_ENDPOINT)를 삭제하고, naver-commerce-product-import-service.ts가 export하는
+      issueSellerAccessToken을 그대로 가져다 쓰도록 변경. 서명 로직은 이제 한 곳(naver-commerce-product-import-service.ts)에만 존재.
+- [x] ApiAccountsView React key/라벨 중복 수정
+      App.tsx의 buildAccountLogFocusCards가 4개 카드 중 3개에 "검증 가능" 라벨을 그대로 복붙해서 쓰고 있었음
+      (실패/성공/실연동 카드까지 전부 같은 텍스트로 표시되던 화면 버그이기도 했음). 라벨을 실패/성공/실연동 실행/검증 모드로
+      구분하고, map의 key도 label 대신 고유값인 filterValue로 변경.
+- [x] API 계정 시크릿 암호화 구현
+      apps/server/src/lib/crypto.ts 신설 (AES-256-GCM, "enc:v1:" 프리픽스로 버전 표시). POST/PUT /accounts에서
+      clientSecret/accessLicense/secretKey를 암호화해서 저장하고, 실제로 네이버 API를 호출하는 3곳
+      (accounts/:id/test, products/import/naver-commerce, naver-product-publish-service.ts)에서 복호화해서 사용하도록 연결.
+      snapshot 응답의 마스킹도 복호화 후 마스킹하도록 수정(암호문이 아니라 실제 값 기준으로 마스킹 표시됨).
+      기존에 평문으로 저장된 값("enc:v1:" 프리픽스 없는 값)은 하위호환으로 그대로 읽히고, 계정을 다시 저장하는 순간
+      자동으로 암호화됨 — 별도 마이그레이션 스크립트 없이 점진적으로 전환됨.
+      주의: ENCRYPTION_SECRET은 .env(gitignore 대상)에 있어서 머신마다 따로 설정해야 함. 이 세션에서 작업한 PC의 .env에는
+      추가해뒀지만, 회사 PC 등 다른 머신의 .env에는 없을 수 있음 — 서버 기동 시 콘솔에 경고가 뜨면 ENCRYPTION_SECRET을
+      추가할 것(값은 아무 랜덤 문자열이면 됨, 예: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`).
 
 ### 참고만 해둘 것
 - 상품 동기화는 매번 네이버 전체 카탈로그를 다시 가져옴 (증분 아님) - "변경된 것만" 가져오는 파라미터가
@@ -60,3 +71,17 @@ npm run dev:web      # http://localhost:5173
 
 깃허브_받기.bat / 깃허브_푸시.bat / 깃허브_동기화.bat 더블클릭으로 실행 가능 (오늘 인코딩 버그 고쳐서
 정상 작동 확인함). 세 개 다 origin/feature/reports 기준으로 동작함.
+
+## 5. 2026-07-22 낮 세션 추가 메모 (Claude, Cowork)
+
+- 위 "우선순위 높음" 3건을 처리했지만 이 세션에서는 git 명령을 실행하지 않았음(커밋/푸시 안 함) —
+  변경 파일은 워킹 트리에만 있는 상태. 다음 작업 전에 `git status`로 확인하고, 문제 없으면
+  깃허브_푸시.bat 또는 수동으로 커밋할 것.
+- 변경/신규 파일: apps/server/src/lib/crypto.ts(신규), apps/server/src/lib/config.ts,
+  apps/server/src/server.ts, apps/server/src/routes/index.ts, apps/server/src/services/naver-api-test-service.ts,
+  apps/server/src/services/naver-product-publish-service.ts, apps/web/src/App.tsx, .env(로컬 전용, git 추적 안 됨)
+- 실서버 기동 후 계정 화면에서 등록/수정 → 연결 테스트 → 상품 불러오기까지 한 번 실행해서
+  암호화 경로(저장 시 암호화, 조회 시 복호화)가 실제로 동작하는지 확인 권장. 특히 TOSAY 실계정처럼
+  이미 평문으로 저장된 기존 계정은 수정 없이도 계속 동작해야 하고(하위호환), 저장 버튼을 한 번 누르면
+  그 시점부터 암호화된 값으로 바뀌는지 확인.
+- Prisma 스키마 변경은 없음 — 마이그레이션 불필요.

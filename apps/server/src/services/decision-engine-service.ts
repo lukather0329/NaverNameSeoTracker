@@ -125,6 +125,17 @@ export async function runDecisionProjection(params: {
     if (error instanceof Error && error.name === "AbortError") {
       throw new Error("의사결정 엔진 응답 시간이 초과되었습니다.");
     }
+    // 몬테카를로 엔진(uvicorn) 프로세스가 꺼져 있으면 fetch가 "fetch failed"/ECONNREFUSED
+    // 같은 저수준 네트워크 에러를 던진다. 사용자에게는 원인을 바로 알 수 있는 메시지로 바꿔서 보여준다.
+    const isConnectionError =
+      error instanceof Error &&
+      (error.message.includes("fetch failed") ||
+        error.message.includes("ECONNREFUSED") ||
+        error.message.includes("ENOTFOUND") ||
+        error.message.includes("ECONNRESET"));
+    if (isConnectionError) {
+      throw new Error("의사결정 엔진(몬테카를로 엔진)에 연결할 수 없습니다. 엔진이 실행 중인지 확인해주세요. (uvicorn rw_decision_engine.api.app:app --port 8765)");
+    }
     throw error;
   } finally {
     clearTimeout(timeoutId);

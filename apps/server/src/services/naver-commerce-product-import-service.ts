@@ -50,6 +50,7 @@ type ImportedCommerceProduct = {
   category: string | null;
   price: number;
   productStatus: "ON_SALE" | "PAUSED" | "SOLD_OUT";
+  naverStatusType: string | null;
 };
 
 export type CommerceProductImportResult = {
@@ -62,7 +63,13 @@ export type CommerceProductImportResult = {
   updatedCount: number;
   unchangedCount: number;
   skippedCount: number;
+  excludedCount: number;
   pageCount: number;
+  forceResync: boolean;
+};
+
+export type ImportProductsOptions = {
+  forceResync?: boolean;
 };
 
 function hasProductChanged(
@@ -74,6 +81,7 @@ function hasProductChanged(
     category: string | null;
     price: number;
     productStatus: string;
+    naverStatusType: string | null;
     apiAccountId: string | null;
   },
   next: ImportedCommerceProduct,
@@ -87,11 +95,16 @@ function hasProductChanged(
     existing.category !== next.category ||
     existing.price !== next.price ||
     existing.productStatus !== next.productStatus ||
+    existing.naverStatusType !== next.naverStatusType ||
     existing.apiAccountId !== accountId
   );
 }
 
-export async function importProductsFromCommerceAccount(account: CommerceApiAccount): Promise<CommerceProductImportResult> {
+export async function importProductsFromCommerceAccount(
+  account: CommerceApiAccount,
+  options: ImportProductsOptions = {}
+): Promise<CommerceProductImportResult> {
+  const forceResync = options.forceResync === true;
   if (account.type !== "COMMERCE") {
     throw new Error("스마트스토어 상품 가져오기는 COMMERCE 계정에서만 지원합니다.");
   }
@@ -108,11 +121,14 @@ export async function importProductsFromCommerceAccount(account: CommerceApiAcco
 
   const accessToken = await issueSellerAccessToken(account.clientId, account.clientSecret, sellerIdentifier);
   const remoteProducts = await fetchAllCommerceProducts(accessToken);
+  const excludedProducts = await prisma.excludedProduct.findMany({ select: { smartStoreProductId: true } });
+  const excludedIds = new Set(excludedProducts.map((item) => item.smartStoreProductId));
 
   let createdCount = 0;
   let updatedCount = 0;
   let unchangedCount = 0;
   let skippedCount = 0;
+  let excludedCount = 0;
 
   await prisma.$transaction(async (tx) => {
     for (const product of remoteProducts) {
@@ -125,8 +141,16 @@ export async function importProductsFromCommerceAccount(account: CommerceApiAcco
         where: { smartStoreProductId: product.smartStoreProductId }
       });
 
+      // 사용자가 프로그램 내에서 이미 삭제한 상품은 네이버에 여전히 살아있어도
+      // 다시 만들지 않는다. (기존 로컬 레코드가 있으면 정상적으로 갱신은 허용 —
+      // 제외 목록은 "재생성 방지"용이지 "갱신 방지"용이 아니다.)
+      if (!existing && excludedIds.has(product.smartStoreProductId)) {
+        excludedCount += 1;
+        continue;
+      }
+
       if (existing) {
-        if (!hasProductChanged(existing, product, account.id)) {
+        if (!forceResync && !hasProductChanged(existing, product, account.id)) {
           unchangedCount += 1;
           continue;
         }
@@ -142,6 +166,7 @@ export async function importProductsFromCommerceAccount(account: CommerceApiAcco
             category: product.category,
             price: product.price,
             productStatus: product.productStatus,
+            naverStatusType: product.naverStatusType,
             apiAccountId: account.id
           }
         });
@@ -162,6 +187,7 @@ export async function importProductsFromCommerceAccount(account: CommerceApiAcco
             category: product.category,
             price: product.price,
             productStatus: product.productStatus,
+            naverStatusType: product.naverStatusType,
             testStatus: "DRAFT"
           }
         });
@@ -174,7 +200,7 @@ export async function importProductsFromCommerceAccount(account: CommerceApiAcco
     data: {
       level: "INFO",
       scope: "product-import",
-      message: `${account.name} 계정 스마트스토어 상품 동기화 완료`,
+      message: `${account.name} 계정 스마트스토어 상품 동기화 완료${forceResync ? " (강제 재동기화)" : ""}`,
       metaJson: JSON.stringify({
         accountId: account.id,
         sellerIdentifier,
@@ -182,7 +208,9 @@ export async function importProductsFromCommerceAccount(account: CommerceApiAcco
         createdCount,
         updatedCount,
         unchangedCount,
-        skippedCount
+        skippedCount,
+        excludedCount,
+        forceResync
       })
     }
   });
@@ -191,12 +219,14 @@ export async function importProductsFromCommerceAccount(account: CommerceApiAcco
     accountId: account.id,
     accountName: account.name,
     sellerIdentifier,
+    forceResync,
     totalFetched: remoteProducts.length,
     importedCount: createdCount + updatedCount,
     createdCount,
     updatedCount,
     unchangedCount,
     skippedCount,
+    excludedCount,
     pageCount: Math.max(1, Math.ceil(remoteProducts.length / PRODUCT_PAGE_SIZE))
   };
 }
@@ -269,7 +299,8 @@ async function fetchAllCommerceProducts(accessToken: string) {
         currentTitle: normalizeNullableString(channelProduct.name) ?? "",
         category: normalizeNullableString(channelProduct.categoryId),
         price: Math.max(0, channelProduct.discountedPrice ?? channelProduct.salePrice ?? 0),
-        productStatus: mapCommerceProductStatus(channelProduct.statusType)
+        productStatus: mapCommerceProductStatus(channelProduct.statusType),
+        naverStatusType: normalizeNullableString(channelProduct.statusType)
       }))
     );
 

@@ -4,6 +4,7 @@ import type {
   ApiAccount,
   ApiAccountFormInput,
   AppSnapshot,
+  ExcludedProductEntry,
   Product,
   RankTrackingJob,
   RankTrackingResult,
@@ -11,21 +12,27 @@ import type {
   SystemLogEntry,
   TitleChangeLog
 } from "@naver-seo-tracker/shared";
+import { TRACKING_INTERVAL_PRESETS_MINUTES, formatTrackingIntervalLabel, parseTrackingIntervalMinutes } from "@naver-seo-tracker/shared";
 import { DataGrid } from "./components/DataGrid";
-import type { DecisionProjectionResponse, ProductImportResponse, PublishTitleResponse } from "./lib/api";
+import type { DecisionProjectionResponse, ProductImportResponse, PublishTitleResponse, RunTrackingJobResponse, UpdateExperimentInput, UpdateExperimentResponse } from "./lib/api";
+import { RankTrendChart } from "./components/RankTrendChart";
 import { SparklineBars } from "./components/SparklineBars";
 import { StatusBadge } from "./components/StatusBadge";
 import {
+  bulkDeleteProducts,
   createApiAccount,
   createExperimentDraft,
+  deleteApiAccount,
   deleteProduct,
   fetchSnapshot,
   importCommerceProducts,
   publishProductTitleToNaver,
+  restoreExcludedProduct,
   runDecisionProjection,
   runTrackingJob,
   testApiAccountConnection,
   updateApiAccount,
+  updateExperiment,
   updateProduct
 } from "./lib/api";
 
@@ -130,6 +137,28 @@ const navItems: Array<{ key: ViewKey; label: string }> = [
   { key: "reports", label: "리포트" }
 ];
 
+// 네이버 커머스API productStatusTypes 원본 코드 -> 화면 표시용 한글 라벨.
+// (내부적으로 쓰는 productStatus는 ON_SALE/PAUSED/SOLD_OUT 3단계로 뭉개서 저장하지만,
+// 실제 스마트스토어 판매상태는 이보다 세분화되어 있어 별도로 naverStatusType에 원본값을 보존한다.)
+const NAVER_STATUS_TYPE_LABELS: Record<string, string> = {
+  WAIT: "전시대기",
+  SALE: "판매중",
+  OUTOFSTOCK: "품절",
+  UNADMISSION: "승인대기",
+  REJECTION: "승인거부",
+  SUSPENSION: "판매중지",
+  CLOSE: "판매종료",
+  PROHIBITION: "판매금지"
+};
+
+function formatNaverStatusType(statusType: string | null | undefined) {
+  if (!statusType) {
+    return "미확인";
+  }
+
+  return NAVER_STATUS_TYPE_LABELS[statusType] ?? statusType;
+}
+
 const defaultApiAccountForm: ApiAccountFormInput = {
   name: "",
   type: "COMMERCE",
@@ -155,6 +184,11 @@ const accountTypeGuides: Record<
     modeLabel: "검증 전용",
     requiredFields: ["클라이언트 ID", "클라이언트 시크릿", "액세스 라이선스", "시크릿 키", "스토어 ID 또는 채널 ID"],
     note: "커머스 실연동 어댑터는 다음 후속 작업입니다."
+  },
+  SHOPPING_SEARCH: {
+    modeLabel: "실제 외부 연동 테스트",
+    requiredFields: ["클라이언트 ID", "클라이언트 시크릿"],
+    note: "네이버 오픈API 쇼핑검색(openapi.naver.com)으로 광고를 제외한 실제 가격비교 순위를 조회합니다. developers.naver.com에서 발급받은 오픈API Client ID/Secret을 사용하세요."
   },
   CUSTOM: {
     modeLabel: "검증 전용",
@@ -182,6 +216,14 @@ const accountSaveTimingGuides: Record<
       "COMMERCE는 현재 검증 전용이므로 실제 외부 테스트는 다음 단계로 계획하세요."
     ]
   },
+  SHOPPING_SEARCH: {
+    recommendedMoment: "실험을 시작해 실제 순위 추적을 돌리기 전에 저장하세요.",
+    steps: [
+      "developers.naver.com에서 오픈API(쇼핑검색) 애플리케이션을 등록하고 Client ID/Secret을 발급받습니다.",
+      "값을 준비한 뒤 바로 저장하고 실연동 테스트로 확인합니다.",
+      "이 계정이 활성 상태여야 실험을 시작할 때 실제 가격비교 순위 추적 작업이 만들어집니다."
+    ]
+  },
   CUSTOM: {
     recommendedMoment: "기본 자격정보가 내부 검토 가능한 상태가 되면 저장하세요.",
     steps: [
@@ -205,7 +247,13 @@ export function App() {
 
   async function loadSnapshot() {
     try {
-      setLoading(true);
+      // 최초 로딩에서만 전체 화면 로딩 패널을 보여준다. 이미 데이터가 있는 상태에서
+      // 삭제/저장 등으로 재조회할 때는 로딩 패널을 띄우지 않는다 — 그걸 띄우면
+      // 화면 하위 트리(ProductsView 등)가 통째로 언마운트됐다가 다시 마운트되면서
+      // 검색어, 페이지, 선택 상태 같은 로컬 state가 전부 초기화되기 때문이다.
+      if (!snapshot) {
+        setLoading(true);
+      }
       setError(null);
       setSnapshot(await fetchSnapshot());
     } catch (caught) {
@@ -216,8 +264,9 @@ export function App() {
   }
 
   async function handleRunJob(jobId: string) {
-    await runTrackingJob(jobId);
+    const response = await runTrackingJob(jobId);
     await loadSnapshot();
+    return response;
   }
 
   async function handleCreateApiAccount(input: ApiAccountFormInput) {
@@ -229,6 +278,12 @@ export function App() {
     await updateApiAccount(accountId, input);
     await loadSnapshot();
   }
+
+  async function handleDeleteApiAccount(accountId: string) {
+    await deleteApiAccount(accountId);
+    await loadSnapshot();
+  }
+
   async function handleTestApiAccount(accountId: string) {
     const result = await testApiAccountConnection(accountId);
     await loadSnapshot();
@@ -242,8 +297,8 @@ export function App() {
     await loadSnapshot();
   }
 
-  async function handleImportCommerceProducts(apiAccountId?: string) {
-    const result = await importCommerceProducts(apiAccountId);
+  async function handleImportCommerceProducts(apiAccountId?: string, forceResync?: boolean) {
+    const result = await importCommerceProducts(apiAccountId, forceResync);
     await loadSnapshot();
     return result;
   }
@@ -253,10 +308,14 @@ export function App() {
       productId: product.id,
       beforeTitle: product.currentTitle,
       afterTitle: product.seoOptimizedTitle?.trim() || product.currentTitle,
-      trackingInterval: "60_MINUTES",
+      trackingInterval: "60",
       startDate: new Date().toISOString(),
       minObservationHours: 24,
-      notes: '상품 상세에서 자동 생성한 실험 초안입니다.'
+      notes: '상품 상세에서 자동 생성한 실험 초안입니다.',
+      // 실험을 나중에 "시작"할 때 순위 추적 작업을 만들 키워드가 필요하므로
+      // 초안 생성 시점에 상품의 대표/추적 키워드를 함께 넘겨 저장해 둔다.
+      primaryKeyword: product.primaryKeyword?.trim() || undefined,
+      trackingKeywords: product.trackingKeywords
     });
     setFocusExperimentId(typeof experiment?.id === 'string' ? experiment.id : null);
     await loadSnapshot();
@@ -271,6 +330,24 @@ export function App() {
   async function handleDeleteProduct(productId: string) {
     await deleteProduct(productId);
     await loadSnapshot();
+  }
+
+  async function handleBulkDeleteProducts(productIds: string[]) {
+    const result = await bulkDeleteProducts(productIds);
+    await loadSnapshot();
+    return result;
+  }
+
+  async function handleRestoreExcludedProduct(id: string) {
+    const result = await restoreExcludedProduct(id);
+    await loadSnapshot();
+    return result;
+  }
+
+  async function handleUpdateExperiment(experimentId: string, input: UpdateExperimentInput) {
+    const result = await updateExperiment(experimentId, input);
+    await loadSnapshot();
+    return result;
   }
 
   async function handlePublishProductTitle(productId: string) {
@@ -323,12 +400,13 @@ export function App() {
                 systemLogs={snapshot.systemLogs ?? []}
                 onCreateAccount={handleCreateApiAccount}
                 onUpdateAccount={handleUpdateApiAccount}
+                onDeleteAccount={handleDeleteApiAccount}
                 onTestAccount={handleTestApiAccount}
                 onToggleAccount={handleToggleApiAccount}
               />
             )}
-            {view === "products" && <ProductsView products={snapshot.products} experiments={snapshot.experiments} titleChangeLogs={snapshot.titleChangeLogs} apiAccounts={snapshot.apiAccounts} systemLogs={snapshot.systemLogs ?? []} onImportProducts={handleImportCommerceProducts} onCreateExperimentDraft={handleCreateExperimentDraft} onUpdateProduct={handleUpdateProduct} onDeleteProduct={handleDeleteProduct} onPublishProductTitle={handlePublishProductTitle} onRunDecisionProjection={handleRunDecisionProjection} onOpenExperimentsView={handleOpenExperimentsView} />}
-            {view === "experiments" && <ExperimentsView experiments={snapshot.experiments} focusExperimentId={focusExperimentId} />}
+            {view === "products" && <ProductsView products={snapshot.products} experiments={snapshot.experiments} titleChangeLogs={snapshot.titleChangeLogs} apiAccounts={snapshot.apiAccounts} systemLogs={snapshot.systemLogs ?? []} excludedProducts={snapshot.excludedProducts ?? []} onImportProducts={handleImportCommerceProducts} onCreateExperimentDraft={handleCreateExperimentDraft} onUpdateProduct={handleUpdateProduct} onDeleteProduct={handleDeleteProduct} onBulkDeleteProducts={handleBulkDeleteProducts} onRestoreExcludedProduct={handleRestoreExcludedProduct} onPublishProductTitle={handlePublishProductTitle} onRunDecisionProjection={handleRunDecisionProjection} onOpenExperimentsView={handleOpenExperimentsView} />}
+            {view === "experiments" && <ExperimentsView experiments={snapshot.experiments} focusExperimentId={focusExperimentId} onUpdateExperiment={handleUpdateExperiment} onDeleteProduct={handleDeleteProduct} />}
             {view === "tracking" && <TrackingJobsView jobs={snapshot.jobs} onRunJob={handleRunJob} />}
             {view === "results" && <ResultsView results={snapshot.results} products={snapshot.products} />}
             {view === "reports" && <ReportsView snapshot={snapshot} />}
@@ -378,6 +456,7 @@ function ApiAccountsView({
   systemLogs,
   onCreateAccount,
   onUpdateAccount,
+  onDeleteAccount,
   onTestAccount,
   onToggleAccount
 }: {
@@ -385,11 +464,13 @@ function ApiAccountsView({
   systemLogs: SystemLogEntry[];
   onCreateAccount: (input: ApiAccountFormInput) => Promise<void>;
   onUpdateAccount: (accountId: string, input: Partial<ApiAccountFormInput>) => Promise<void>;
+  onDeleteAccount: (accountId: string) => Promise<void>;
   onTestAccount: (accountId: string) => Promise<{ ok: boolean; message: string; mode?: string; statusCode?: number; details?: string }>;
   onToggleAccount: (account: ApiAccount) => Promise<void>;
 }) {
   const [form, setForm] = useState<ApiAccountFormInput>(defaultApiAccountForm);
   const [submitting, setSubmitting] = useState(false);
+  const [deletingAccountId, setDeletingAccountId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<FeedbackState | null>(null);
   const [accountFilter, setAccountFilter] = useState<AccountFilterValue>("ALL");
   const [activeOnly, setActiveOnly] = useState(false);
@@ -448,17 +529,23 @@ function ApiAccountsView({
     ? ["계정명", "유형", "클라이언트 ID", "클라이언트 시크릿", "스토어 ID 또는 채널 ID 1개"]
     : form.type === "SEARCH_AD"
       ? ["계정명", "유형", "클라이언트 ID", "클라이언트 시크릿", "액세스 라이선스", "시크릿 키", "고객 ID"]
-      : ["계정명", "유형", "클라이언트 ID", "클라이언트 시크릿"];
+      : form.type === "SHOPPING_SEARCH"
+        ? ["계정명", "유형", "오픈API 클라이언트 ID", "오픈API 클라이언트 시크릿"]
+        : ["계정명", "유형", "클라이언트 ID", "클라이언트 시크릿"];
   const accountOptionalSummaryChips = form.type === "COMMERCE"
     ? ["스토어 ID와 채널 ID를 둘 다 알고 있으면 같이 저장 가능", "액세스 라이선스와 시크릿 키는 커머스 저장에 필요하지 않음"]
     : form.type === "SEARCH_AD"
       ? ["검색광고 API는 스토어 ID와 채널 ID를 사용하지 않음"]
-      : ["CUSTOM 유형은 최소 연결 정보만 먼저 저장", "추가 인증값은 이후 확장 시점에 연결"];
+      : form.type === "SHOPPING_SEARCH"
+        ? ["쇼핑검색 API는 액세스 라이선스, 시크릿 키, 스토어/채널 ID를 사용하지 않음", "활성 상태인 계정 1개만 실험 시작 시 자동으로 사용됨"]
+        : ["CUSTOM 유형은 최소 연결 정보만 먼저 저장", "추가 인증값은 이후 확장 시점에 연결"];
   const accountRegistrationNote = form.type === "COMMERCE"
     ? "커머스 API는 클라이언트 ID, 클라이언트 시크릿, 스토어 ID 또는 채널 ID 중 1개만 있으면 저장할 수 있으며, 저장 후 바로 실테스트와 상품 불러오기를 진행할 수 있습니다."
     : form.type === "SEARCH_AD"
       ? "검색광고 API는 고객 ID까지 포함한 검색광고 전용 인증값을 모두 채워야 저장할 수 있습니다."
-      : "CUSTOM 유형은 계정명, 유형, 클라이언트 ID, 클라이언트 시크릿만 저장합니다.";
+      : form.type === "SHOPPING_SEARCH"
+        ? "쇼핑검색 API는 developers.naver.com에서 발급받은 오픈API 클라이언트 ID/시크릿만 있으면 저장할 수 있으며, 저장 후 바로 실테스트를 진행할 수 있습니다."
+        : "CUSTOM 유형은 계정명, 유형, 클라이언트 ID, 클라이언트 시크릿만 저장합니다.";
   const accountFilterOptions: Array<{ value: AccountFilterValue; label: string }> = [
     { value: "ALL", label: `전체 (${accounts.length})` },
     { value: "LIVE_READY", label: `실테스트 가능 (${accounts.filter((account) => getAccountReadinessState(account) === "LIVE_READY").length})` },
@@ -497,6 +584,24 @@ function ApiAccountsView({
     setEditingAccountId(null);
     setFeedback(null);
     setForm(defaultApiAccountForm);
+  }
+
+  async function handleDeleteAccountClick(account: ApiAccount) {
+    const confirmed = window.confirm(account.name + ' 계정을 삭제하시겠습니까? 이미 이 계정으로 불러온 상품에는 영향을 주지 않습니다.');
+    if (!confirmed) return;
+
+    try {
+      setDeletingAccountId(account.id);
+      await onDeleteAccount(account.id);
+      if (editingAccountId === account.id) {
+        handleCancelEdit();
+      }
+      setFeedback({ tone: 'success', message: account.name + ' 계정을 삭제했습니다.' });
+    } catch (error) {
+      setFeedback({ tone: 'error', message: error instanceof Error ? error.message : 'API 계정 삭제에 실패했습니다.' });
+    } finally {
+      setDeletingAccountId(null);
+    }
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -614,7 +719,7 @@ function ApiAccountsView({
               const isActive = logFilter === item.filterValue;
               return (
                 <button
-                  key={item.label}
+                  key={item.filterValue}
                   type="button"
                   className={`metric-card panel compact-card focus-card ${item.toneClass}${isActive ? " active" : ""}`}
                   onClick={() => setLogFilter(isActive ? "ALL" : item.filterValue)}
@@ -679,6 +784,8 @@ function ApiAccountsView({
           <a className="inline-link-button" href="https://apicenter.commerce.naver.com/docs/introduction" target="_blank" rel="noreferrer">{"커머스 API 문서 보기"}</a>
           <a className="inline-link-button" href="https://naver.github.io/searchad-apidoc/" target="_blank" rel="noreferrer">{"검색광고 API 문서 보기"}</a>
           <a className="inline-link-button" href="https://ads.naver.com/help/faq/302" target="_blank" rel="noreferrer">{"검색광고 API 안내 보기"}</a>
+          <a className="inline-link-button" href="https://developers.naver.com/apps/#/register?api=search" target="_blank" rel="noreferrer">{"오픈API 애플리케이션 등록"}</a>
+          <a className="inline-link-button" href="https://developers.naver.com/docs/serviceapi/search/shopping/shopping.md" target="_blank" rel="noreferrer">{"오픈API 쇼핑검색 문서 보기"}</a>
         </div>
       </div>
       {editingAccount && (
@@ -700,6 +807,7 @@ function ApiAccountsView({
           >
             <option value="COMMERCE">네이버 커머스 API</option>
             <option value="SEARCH_AD">네이버 검색광고 API</option>
+            <option value="SHOPPING_SEARCH">네이버 오픈API 쇼핑검색 (순위 추적용)</option>
             <option value="CUSTOM">커스텀 / 향후 어댑터</option>
           </select>
         </label>
@@ -752,14 +860,21 @@ function ApiAccountsView({
           <input type="checkbox" checked={form.isActive} onChange={(event) => setForm({ ...form, isActive: event.target.checked })} />
           <span>활성화</span>
         </label>
-        <button
-          type="submit"
-          className="action-button"
-          disabled={submitting || !canSaveAccount}
-          title={canSaveAccount ? "계정 저장" : formReadiness.missingFields.join(", ")}
-        >
-          {submitting ? (editingAccount ? "수정 중..." : "저장 중...") : canSaveAccount ? (editingAccount ? "계정 수정 저장" : "계정 저장") : "필수 항목 입력 필요"}
-        </button>
+        <div className="inline-actions">
+          <button
+            type="submit"
+            className="action-button"
+            disabled={submitting || !canSaveAccount}
+            title={canSaveAccount ? "계정 저장" : formReadiness.missingFields.join(", ")}
+          >
+            {submitting ? (editingAccount ? "수정 중..." : "저장 중...") : canSaveAccount ? (editingAccount ? "계정 수정 저장" : "계정 저장") : "필수 항목 입력 필요"}
+          </button>
+          {editingAccount && (
+            <button type="button" className="action-button secondary" onClick={handleCancelEdit}>
+              {'수정 취소'}
+            </button>
+          )}
+        </div>
       </form>
       <div className="form-readiness-card">
         <div className="section-heading">
@@ -877,6 +992,17 @@ function ApiAccountsView({
                   <button type="button" className="action-button secondary" onClick={() => void onToggleAccount(row)}>
                     {row.isActive ? "비활성화" : "활성화"}
                   </button>
+                  <button type="button" className="action-button secondary" onClick={() => handleStartEdit(row)}>
+                    {'수정'}
+                  </button>
+                  <button
+                    type="button"
+                    className="action-button danger"
+                    onClick={() => void handleDeleteAccountClick(row)}
+                    disabled={deletingAccountId === row.id}
+                  >
+                    {deletingAccountId === row.id ? '삭제 중...' : '삭제'}
+                  </button>
                 </div>
               );
             }
@@ -943,16 +1069,89 @@ function ApiAccountsView({
   );
 }
 
+// 상품목록 그리드에서 SEO상품명/키워드/추적키워드를 상세패널을 열지 않고
+// 바로 입력·저장할 수 있게 하는 인라인 편집 셀. 포커스를 벗어날 때(onBlur) 값이
+// 바뀐 경우에만 저장하고, 저장 실패 시에는 이전 값으로 되돌린다.
+function InlineEditableCell({
+  value,
+  placeholder,
+  multiline,
+  onSave
+}: {
+  value: string;
+  placeholder?: string;
+  multiline?: boolean;
+  onSave: (nextValue: string) => Promise<void>;
+}) {
+  const [draft, setDraft] = useState(value);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setDraft(value);
+  }, [value]);
+
+  async function commit() {
+    if (draft === value) {
+      return;
+    }
+    setSaving(true);
+    try {
+      await onSave(draft);
+    } catch (error) {
+      setDraft(value);
+      window.alert(error instanceof Error ? error.message : '저장에 실패했습니다.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (multiline) {
+    return (
+      <textarea
+        className="inline-edit-cell"
+        rows={2}
+        value={draft}
+        placeholder={placeholder}
+        disabled={saving}
+        onChange={(event) => setDraft(event.target.value)}
+        onBlur={() => void commit()}
+        onClick={(event) => event.stopPropagation()}
+      />
+    );
+  }
+
+  return (
+    <input
+      className="inline-edit-cell"
+      type="text"
+      value={draft}
+      placeholder={placeholder}
+      disabled={saving}
+      onChange={(event) => setDraft(event.target.value)}
+      onBlur={() => void commit()}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter') {
+          (event.target as HTMLInputElement).blur();
+        }
+      }}
+      onClick={(event) => event.stopPropagation()}
+    />
+  );
+}
+
 function ProductsView({
   products,
   experiments,
   titleChangeLogs,
   apiAccounts,
   systemLogs,
+  excludedProducts,
   onImportProducts,
   onCreateExperimentDraft,
   onUpdateProduct,
   onDeleteProduct,
+  onBulkDeleteProducts,
+  onRestoreExcludedProduct,
   onPublishProductTitle,
   onRunDecisionProjection,
   onOpenExperimentsView
@@ -962,15 +1161,19 @@ function ProductsView({
   titleChangeLogs: TitleChangeLog[];
   apiAccounts: ApiAccount[];
   systemLogs: SystemLogEntry[];
-  onImportProducts: (apiAccountId?: string) => Promise<ProductImportResponse>;
+  excludedProducts: ExcludedProductEntry[];
+  onImportProducts: (apiAccountId?: string, forceResync?: boolean) => Promise<ProductImportResponse>;
   onCreateExperimentDraft: (product: Product) => Promise<void>;
   onUpdateProduct: (productId: string, input: { seoOptimizedTitle?: string; primaryKeyword?: string; trackingKeywords?: string[] }) => Promise<void>;
   onDeleteProduct: (productId: string) => Promise<void>;
+  onBulkDeleteProducts: (productIds: string[]) => Promise<{ ok: boolean; deletedCount: number }>;
+  onRestoreExcludedProduct: (id: string) => Promise<{ ok: boolean }>;
   onPublishProductTitle: (productId: string) => Promise<PublishTitleResponse>;
   onRunDecisionProjection: (productId: string, input: { seoTitle?: string; primaryKeyword?: string; trackingKeywords?: string[]; targetRank?: number; iterations?: number; seed?: number; horizonDays?: number }) => Promise<DecisionProjectionResponse>;
   onOpenExperimentsView: () => void;
 }) {
   const [importing, setImporting] = useState(false);
+  const [forceResyncOnImport, setForceResyncOnImport] = useState(false);
   const [creatingExperimentId, setCreatingExperimentId] = useState('');
   const [savingProductDetail, setSavingProductDetail] = useState(false);
   const [publishingTitle, setPublishingTitle] = useState(false);
@@ -978,11 +1181,17 @@ function ProductsView({
   const [selectedImportAccountId, setSelectedImportAccountId] = useState('');
   const [productSearchQuery, setProductSearchQuery] = useState('');
   const [productStatusFilter, setProductStatusFilter] = useState<'ALL' | Product['testStatus']>('ALL');
+  const [saleStatusFilter, setSaleStatusFilter] = useState('ALL');
   const [categoryFilter, setCategoryFilter] = useState('ALL');
   const [seoReadyOnly, setSeoReadyOnly] = useState(false);
   const [productPage, setProductPage] = useState(1);
   const [productPageSize, setProductPageSize] = useState(10);
+  const [excludedListCollapsed, setExcludedListCollapsed] = useState(false);
+  const [excludedProductPage, setExcludedProductPage] = useState(1);
   const [deletingProductId, setDeletingProductId] = useState<string | null>(null);
+  const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [bulkCreatingDrafts, setBulkCreatingDrafts] = useState(false);
   const [selectedDetailProductId, setSelectedDetailProductId] = useState<string | null>(products[0]?.id ?? null);
   const [detailForm, setDetailForm] = useState({ seoOptimizedTitle: '', primaryKeyword: '', trackingKeywords: '' });
   const [runningDecisionProjection, setRunningDecisionProjection] = useState(false);
@@ -1032,6 +1241,11 @@ function ProductsView({
     lastImportResult ? '\uBC18\uC601 ' + lastImportResult.importedCount + '\uAC1C / \uC870\uD68C ' + lastImportResult.totalFetched + '\uAC1C' : '\uCD5C\uADFC \uB3D9\uAE30\uD654 \uC5C6\uC74C'
   ];
   const categoryOptions = Array.from(new Set(products.map((product) => product.category?.trim()).filter((value): value is string => Boolean(value)))).sort((left, right) => left.localeCompare(right, 'ko'));
+  const saleStatusOptions = Array.from(new Set(products.map((product) => product.naverStatusType ?? '__NONE__'))).sort((left, right) => {
+    if (left === '__NONE__') return 1;
+    if (right === '__NONE__') return -1;
+    return formatNaverStatusType(left).localeCompare(formatNaverStatusType(right), 'ko');
+  });
   const filteredProducts = products.filter((product) => {
     const query = productSearchQuery.trim().toLowerCase();
     const matchesQuery =
@@ -1042,20 +1256,45 @@ function ProductsView({
       product.smartStoreProductId.toLowerCase().includes(query) ||
       (product.sellerManagementCode ?? '').toLowerCase().includes(query);
     const matchesStatus = productStatusFilter === 'ALL' || product.testStatus === productStatusFilter;
+    const matchesSaleStatus = saleStatusFilter === 'ALL' || (product.naverStatusType ?? '__NONE__') === saleStatusFilter;
     const matchesCategory = categoryFilter === 'ALL' || (product.category?.trim() ?? '') === categoryFilter;
     const matchesSeo = !seoReadyOnly || Boolean(product.seoOptimizedTitle?.trim());
-    return matchesQuery && matchesStatus && matchesCategory && matchesSeo;
+    return matchesQuery && matchesStatus && matchesSaleStatus && matchesCategory && matchesSeo;
   });
   const totalProductPages = Math.max(1, Math.ceil(filteredProducts.length / productPageSize));
   const paginatedProducts = filteredProducts.slice((productPage - 1) * productPageSize, (productPage - 1) * productPageSize + productPageSize);
+  const pageWindowSize = 10;
+  const pageWindowStart = Math.floor((productPage - 1) / pageWindowSize) * pageWindowSize + 1;
+  const pageWindowEnd = Math.min(pageWindowStart + pageWindowSize - 1, totalProductPages);
+  const pageNumbers = Array.from({ length: pageWindowEnd - pageWindowStart + 1 }, (_, index) => pageWindowStart + index);
+
+  const excludedProductPageSize = 10;
+  const totalExcludedProductPages = Math.max(1, Math.ceil(excludedProducts.length / excludedProductPageSize));
+  const paginatedExcludedProducts = excludedProducts.slice(
+    (excludedProductPage - 1) * excludedProductPageSize,
+    (excludedProductPage - 1) * excludedProductPageSize + excludedProductPageSize
+  );
+  const excludedPageNumbers = Array.from({ length: totalExcludedProductPages }, (_, index) => index + 1);
 
   useEffect(() => {
     setProductPage(1);
-  }, [productSearchQuery, productStatusFilter, categoryFilter, seoReadyOnly, productPageSize]);
+  }, [productSearchQuery, productStatusFilter, saleStatusFilter, categoryFilter, seoReadyOnly, productPageSize]);
 
   useEffect(() => {
     setProductPage((current) => Math.min(current, totalProductPages));
   }, [totalProductPages]);
+
+  useEffect(() => {
+    setExcludedProductPage((current) => Math.min(current, totalExcludedProductPages));
+  }, [totalExcludedProductPages]);
+
+  useEffect(() => {
+    setSelectedProductIds((current) => {
+      const validIds = new Set(products.map((product) => product.id));
+      const next = new Set([...current].filter((id) => validIds.has(id)));
+      return next.size === current.size ? current : next;
+    });
+  }, [products]);
 
   const selectedDetailProduct =
     filteredProducts.find((product) => product.id === selectedDetailProductId) ??
@@ -1075,7 +1314,7 @@ function ProductsView({
   const detailProgressLabel = selectedDetailIndex >= 0 && filteredProducts.length > 0
     ? '\uD604\uC7AC ' + (selectedDetailIndex + 1) + ' / ' + filteredProducts.length + ' \uBC88\uC9F8 \uC0C1\uD488'
     : '\uC120\uD0DD\uB41C \uC0C1\uD488 \uC5C6\uC74C';
-  const hasActiveProductFilters = productSearchQuery.trim().length > 0 || productStatusFilter !== 'ALL' || categoryFilter !== 'ALL' || seoReadyOnly;
+  const hasActiveProductFilters = productSearchQuery.trim().length > 0 || productStatusFilter !== 'ALL' || saleStatusFilter !== 'ALL' || categoryFilter !== 'ALL' || seoReadyOnly;
   const relatedExperiments = selectedDetailProduct ? experiments.filter((experiment) => experiment.productId === selectedDetailProduct.id).slice(0, 5) : [];
   const relatedTitleChangeLogs = selectedDetailProduct ? titleChangeLogs.filter((log) => log.productId === selectedDetailProduct.id).slice(0, 5) : [];
   const titleComparison = buildTitleComparison(selectedDetailProduct?.currentTitle ?? '', detailForm.seoOptimizedTitle);
@@ -1153,15 +1392,16 @@ function ProductsView({
 
     try {
       setImporting(true);
-      setFeedback({ tone: 'info', message: '\uC2A4\uB9C8\uD2B8\uC2A4\uD1A0\uC5B4 \uC0C1\uD488 \uBD88\uB7EC\uC624\uAE30\uB97C \uC2DC\uC791\uD569\uB2C8\uB2E4.' });
-      const result = await onImportProducts(selectedImportAccountId);
+      setFeedback({ tone: 'info', message: forceResyncOnImport ? '\uC2A4\uB9C8\uD2B8\uC2A4\uD1A0\uC5B4 \uC0C1\uD488 \uAC15\uC81C \uC7AC\uB3D9\uAE30\uD654\uB97C \uC2DC\uC791\uD569\uB2C8\uB2E4. (\uBCC0\uACBD \uC5C6\uB294 \uC0C1\uD488\uB3C4 \uC804\uBD80 \uB2E4\uC2DC \uAE30\uB85D\uD569\uB2C8\uB2E4)' : '\uC2A4\uB9C8\uD2B8\uC2A4\uD1A0\uC5B4 \uC0C1\uD488 \uBD88\uB7EC\uC624\uAE30\uB97C \uC2DC\uC791\uD569\uB2C8\uB2E4.' });
+      const result = await onImportProducts(selectedImportAccountId, forceResyncOnImport);
       setLastImportResult(result);
       setProductSearchQuery('');
       setProductStatusFilter('ALL');
+      setSaleStatusFilter('ALL');
       setCategoryFilter('ALL');
       setSeoReadyOnly(false);
       setFocusSeoPendingAfterImport(true);
-      setFeedback({ tone: 'success', message: '\uB3D9\uAE30\uD654 \uC644\uB8CC: \uC2A4\uD1A0\uC5B4 ' + result.sellerIdentifier + ' / \uC870\uD68C ' + result.totalFetched + '\uAC1C / \uBC18\uC601 ' + result.importedCount + '\uAC1C / \uC2E0\uADDC ' + result.createdCount + '\uAC1C / \uC5C5\uB370\uC774\uD2B8 ' + result.updatedCount + '\uAC1C / \uBCC0\uACBD\uC5C6\uC74C ' + result.unchangedCount + '\uAC1C / \uC81C\uC678 ' + result.skippedCount + '\uAC1C' });
+      setFeedback({ tone: 'success', message: (result.forceResync ? '\uAC15\uC81C \uC7AC\uB3D9\uAE30\uD654 \uC644\uB8CC: ' : '\uB3D9\uAE30\uD654 \uC644\uB8CC: ') + '\uC2A4\uD1A0\uC5B4 ' + result.sellerIdentifier + ' / \uC870\uD68C ' + result.totalFetched + '\uAC1C / \uBC18\uC601 ' + result.importedCount + '\uAC1C / \uC2E0\uADDC ' + result.createdCount + '\uAC1C / \uC5C5\uB370\uC774\uD2B8 ' + result.updatedCount + '\uAC1C / \uBCC0\uACBD\uC5C6\uC74C ' + result.unchangedCount + '\uAC1C / \uC81C\uC678 ' + result.skippedCount + '\uAC1C / \uC7AC\uC0DD\uC131 \uBC29\uC9C0 ' + (result.excludedCount ?? 0) + '\uAC1C' });
     } catch (error) {
       setFeedback({ tone: 'error', message: error instanceof Error ? error.message : '\uC2A4\uB9C8\uD2B8\uC2A4\uD1A0\uC5B4 \uC0C1\uD488 \uBAA9\uB85D \uC870\uD68C\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4.' });
     } finally {
@@ -1172,6 +1412,7 @@ function ProductsView({
   function handleResetProductFilters() {
     setProductSearchQuery('');
     setProductStatusFilter('ALL');
+    setSaleStatusFilter('ALL');
     setCategoryFilter('ALL');
     setSeoReadyOnly(false);
     setFeedback({ tone: 'info', message: '\uC0C1\uD488 \uD544\uD130\uB97C \uCD08\uAE30\uD654\uD588\uC2B5\uB2C8\uB2E4.' });
@@ -1192,6 +1433,136 @@ function ProductsView({
     } finally {
       setDeletingProductId(null);
     }
+  }
+
+  function handleToggleProductSelect(productId: string) {
+    setSelectedProductIds((current) => {
+      const next = new Set(current);
+      if (next.has(productId)) {
+        next.delete(productId);
+      } else {
+        next.add(productId);
+      }
+      return next;
+    });
+  }
+
+  function handleToggleSelectAllOnPage(checked: boolean) {
+    setSelectedProductIds((current) => {
+      const next = new Set(current);
+      for (const product of paginatedProducts) {
+        if (checked) {
+          next.add(product.id);
+        } else {
+          next.delete(product.id);
+        }
+      }
+      return next;
+    });
+  }
+
+  function handleClearProductSelection() {
+    setSelectedProductIds(new Set());
+  }
+
+  async function performBulkDelete(targetIds: string[], confirmMessage: string) {
+    if (targetIds.length === 0) {
+      return;
+    }
+
+    const confirmed = window.confirm(confirmMessage);
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setBulkDeleting(true);
+      const result = await onBulkDeleteProducts(targetIds);
+      setSelectedProductIds(new Set());
+      setFeedback({ tone: 'success', message: result.deletedCount + '개 상품을 일괄 삭제했습니다.' });
+    } catch (error) {
+      setFeedback({ tone: 'error', message: error instanceof Error ? error.message : '상품 일괄 삭제에 실패했습니다.' });
+    } finally {
+      setBulkDeleting(false);
+    }
+  }
+
+  async function handleBulkDeleteClick() {
+    const targetIds = Array.from(selectedProductIds);
+    await performBulkDelete(targetIds, targetIds.length + '개 상품을 추적 목록에서 일괄 삭제하시겠습니까? (네이버 실제 상품에는 영향을 주지 않습니다)');
+  }
+
+  async function handleBulkCreateDraftsClick() {
+    const targetIds = Array.from(selectedProductIds);
+    if (targetIds.length === 0) {
+      return;
+    }
+    const confirmed = window.confirm(targetIds.length + '개 상품에 대해 실험 초안을 일괄 생성하시겠습니까?');
+    if (!confirmed) {
+      return;
+    }
+
+    setBulkCreatingDrafts(true);
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const productId of targetIds) {
+      const product = products.find((item) => item.id === productId);
+      if (!product) {
+        failCount += 1;
+        continue;
+      }
+      try {
+        await onCreateExperimentDraft(product);
+        successCount += 1;
+      } catch (error) {
+        failCount += 1;
+      }
+    }
+
+    setBulkCreatingDrafts(false);
+    handleClearProductSelection();
+    setFeedback({
+      tone: failCount === 0 ? 'success' : 'error',
+      message: '실험 초안 ' + successCount + '개를 생성했습니다.' + (failCount > 0 ? ' (' + failCount + '개 실패)' : '')
+    });
+  }
+
+  function describeActiveProductFilters() {
+    const parts: string[] = [];
+    const query = productSearchQuery.trim();
+
+    if (query) {
+      parts.push('검색어 "' + query + '"');
+    }
+    if (productStatusFilter !== 'ALL') {
+      parts.push('테스트 상태 ' + productStatusFilter);
+    }
+    if (saleStatusFilter !== 'ALL') {
+      parts.push('판매상태 ' + formatNaverStatusType(saleStatusFilter === '__NONE__' ? null : saleStatusFilter));
+    }
+    if (categoryFilter !== 'ALL') {
+      parts.push('카테고리 ' + categoryFilter);
+    }
+    if (seoReadyOnly) {
+      parts.push('SEO 입력완료만');
+    }
+
+    return parts.length > 0 ? parts.join(' · ') : '전체 상품';
+  }
+
+  async function handleSelectFilteredForDelete() {
+    const targetIds = filteredProducts.map((product) => product.id);
+
+    if (!hasActiveProductFilters || targetIds.length === 0) {
+      return;
+    }
+
+    setSelectedProductIds(new Set(targetIds));
+    await performBulkDelete(
+      targetIds,
+      '다음 필터에 해당하는 상품 ' + targetIds.length + '개를 추적 목록에서 일괄 삭제하시겠습니까? (' + describeActiveProductFilters() + ') 네이버 실제 상품에는 영향을 주지 않습니다.'
+    );
   }
 
   function handleStartSeoPendingReview() {
@@ -1355,8 +1726,10 @@ function ProductsView({
       setDecisionProjection(result);
       setFeedback({ tone: 'success', message: '결과를 불러왔습니다.' });
     } catch (error) {
+      const message = error instanceof Error ? error.message : '결과를 불러오지 못했습니다.';
       setDecisionProjection(null);
-      setFeedback({ tone: 'warning', message: error instanceof Error ? error.message : '결과를 불러오지 못했습니다.' });
+      setFeedback({ tone: 'warning', message });
+      window.alert('[분석 실행 실패] ' + message);
     } finally {
       setRunningDecisionProjection(false);
     }
@@ -1373,8 +1746,12 @@ function ProductsView({
         <div>
           <div className="inline-actions">
             <button type="button" className="action-button secondary" onClick={handleExportProductsCsv}>{'\uC0C1\uD488 \uBAA9\uB85D CSV'}</button>
+            <label className="checkbox-field inline-checkbox" title={'\uCF1C\uBA74 \uBCC0\uACBD \uC0AC\uD56D\uC774 \uC5C6\uC5B4 \uBCF4\uC774\uB294 \uC0C1\uD488\uB3C4 \uC804\uBD80 \uB2E4\uC2DC \uC800\uC7A5\uD569\uB2C8\uB2E4. \uC774\uBBF8 \uB3D9\uAE30\uD654\uB41C \uC0C1\uD488\uC5D0 \uD310\uB9E4\uC0C1\uD0DC \uAC19\uC740 \uC0C8 \uD544\uB4DC\uAC00 \uBE44\uC5B4 \uC788\uC744 \uB54C \uCC44\uC6B0\uB294 \uC6A9\uB3C4\uC785\uB2C8\uB2E4.'}>
+              <input type="checkbox" checked={forceResyncOnImport} onChange={(event) => setForceResyncOnImport(event.target.checked)} />
+              <span>{'\uAC15\uC81C \uC7AC\uB3D9\uAE30\uD654'}</span>
+            </label>
             <button type="button" className="action-button" onClick={() => void handleImportClick()} disabled={importing || activeCommerceAccounts.length === 0}>
-              {importing ? '\uB370\uC774\uD130\uB97C \uBD88\uB7EC\uC624\uB294 \uC911\uC785\uB2C8\uB2E4.' : '\uC2A4\uB9C8\uD2B8\uC2A4\uD1A0\uC5B4 \uC0C1\uD488 \uBD88\uB7EC\uC624\uAE30'}
+              {importing ? '\uB370\uC774\uD130\uB97C \uBD88\uB7EC\uC624\uB294 \uC911\uC785\uB2C8\uB2E4.' : forceResyncOnImport ? '\uC2A4\uB9C8\uD2B8\uC2A4\uD1A0\uC5B4 \uC0C1\uD488 \uAC15\uC81C \uC7AC\uB3D9\uAE30\uD654' : '\uC2A4\uB9C8\uD2B8\uC2A4\uD1A0\uC5B4 \uC0C1\uD488 \uBD88\uB7EC\uC624\uAE30'}
             </button>
           </div>
           <div className="report-summary-chips">
@@ -1413,7 +1790,7 @@ function ProductsView({
             <input value={productSearchQuery} onChange={(event) => setProductSearchQuery(event.target.value)} placeholder={'\uC0C1\uD488\uBA85, SEO \uC0C1\uD488\uBA85, ID\uB97C \uAC80\uC0C9\uD558\uC138\uC694'} />
           </label>
           <label>
-            <span>{'\uC0C1\uD0DC'}</span>
+            <span>{'\uD14C\uC2A4\uD2B8 \uC0C1\uD0DC'}</span>
             <select value={productStatusFilter} onChange={(event) => setProductStatusFilter(event.target.value as 'ALL' | Product['testStatus'])}>
               <option value="ALL">{'\uC804\uCCB4'}</option>
               <option value="DRAFT">{'\uCD08\uC548'}</option>
@@ -1421,6 +1798,15 @@ function ProductsView({
               <option value="PAUSED">{'\uC77C\uC2DC \uC911\uC9C0'}</option>
               <option value="COMPLETED">{'\uC644\uB8CC'}</option>
               <option value="FAILED">{'\uC2E4\uD328'}</option>
+            </select>
+          </label>
+          <label>
+            <span>{'\uD310\uB9E4\uC0C1\uD0DC'}</span>
+            <select value={saleStatusFilter} onChange={(event) => setSaleStatusFilter(event.target.value)}>
+              <option value="ALL">{'\uC804\uCCB4'}</option>
+              {saleStatusOptions.map((statusType) => (
+                <option key={statusType} value={statusType}>{formatNaverStatusType(statusType === '__NONE__' ? null : statusType)}</option>
+              ))}
             </select>
           </label>
           <label>
@@ -1443,6 +1829,15 @@ function ProductsView({
           </button>
           <button type="button" className="action-button secondary" onClick={handleResetProductFilters} disabled={!hasActiveProductFilters}>
             {'\uD544\uD130 \uCD08\uAE30\uD654'}
+          </button>
+          <button
+            type="button"
+            className="action-button danger"
+            onClick={() => void handleSelectFilteredForDelete()}
+            disabled={!hasActiveProductFilters || filteredProducts.length === 0}
+            title={'\uD604\uC7AC \uC801\uC6A9\uB41C \uAC80\uC0C9\uC5B4/\uD310\uB9E4\uC0C1\uD0DC/\uD14C\uC2A4\uD2B8\uC0C1\uD0DC/\uCE74\uD14C\uACE0\uB9AC \uD544\uD130\uC5D0 \uD574\uB2F9\uD558\uB294 \uC0C1\uD488\uC744 \uC804\uBD80 \uC120\uD0DD\uD574 \uC77C\uAD04 \uC0AD\uC81C\uD569\uB2C8\uB2E4.'}
+          >
+            {'\uD544\uD130\uACB0\uACFC \uC804\uCCB4 \uC120\uD0DD \uC0AD\uC81C (' + filteredProducts.length + '\uAC1C)'}
           </button>
           <span className="helper-copy product-filter-helper">{seoPendingProducts.length > 0 ? '\uC544\uC9C1 SEO \uBBF8\uC785\uB825 \uC0C1\uD488 ' + seoPendingProducts.length + '\uAC1C\uAC00 \uB0A8\uC544 \uC788\uC2B5\uB2C8\uB2E4.' : '\uBAA8\uB4E0 \uD544\uD130 \uB300\uC0C1 \uC0C1\uD488\uC5D0 SEO \uC785\uB825\uC774 \uC788\uC2B5\uB2C8\uB2E4.'}</span>
         </div>
@@ -1475,12 +1870,32 @@ function ProductsView({
             </select>
           </label>
         </div>
+        {selectedProductIds.size > 0 && (
+          <div className="bulk-action-bar">
+            <span className="helper-copy">{selectedProductIds.size + '개 선택됨'}</span>
+            <div className="inline-actions">
+              <button type="button" className="action-button secondary" onClick={handleClearProductSelection} disabled={bulkDeleting}>
+                선택 해제
+              </button>
+              <button type="button" className="action-button secondary" onClick={() => void handleBulkCreateDraftsClick()} disabled={bulkDeleting || bulkCreatingDrafts}>
+                {bulkCreatingDrafts ? '초안 생성 중...' : '일괄 초안 만들기 (' + selectedProductIds.size + '개)'}
+              </button>
+              <button type="button" className="action-button danger" onClick={() => void handleBulkDeleteClick()} disabled={bulkDeleting || bulkCreatingDrafts}>
+                {bulkDeleting ? '삭제 중...' : '선택 삭제 (' + selectedProductIds.size + '개)'}
+              </button>
+            </div>
+          </div>
+        )}
         <DataGrid
+          selectable
+          selectedIds={selectedProductIds}
+          onToggleSelect={handleToggleProductSelect}
+          onToggleSelectAll={handleToggleSelectAllOnPage}
           columns={[
             {
               key: 'actions',
               title: '관리',
-              width: 130,
+              width: 190,
               sticky: true,
               render: (row) => (
                 <div className="inline-actions">
@@ -1499,28 +1914,153 @@ function ProductsView({
               )
             },
             { key: 'smartStoreProductId', title: 'ID', width: 160 },
-            { key: 'currentTitle', title: '현재 상품명', width: 300 },
-            { key: 'seoOptimizedTitle', title: 'SEO 상품명', width: 320 },
-            { key: 'primaryKeyword', title: '키워드', width: 160 },
-            { key: 'trackingKeywords', title: '추적 키워드', width: 220, render: (row) => row.trackingKeywords.join(', ') },
+            { key: 'currentTitle', title: '현재 상품명', width: 420 },
+            {
+              key: 'seoOptimizedTitle',
+              title: 'SEO 상품명',
+              width: 240,
+              wrap: true,
+              render: (row) => (
+                <InlineEditableCell
+                  value={row.seoOptimizedTitle ?? ''}
+                  placeholder={'SEO 상품명 입력'}
+                  multiline
+                  onSave={(nextValue) => onUpdateProduct(row.id, { seoOptimizedTitle: nextValue.trim() })}
+                />
+              )
+            },
+            {
+              key: 'primaryKeyword',
+              title: '키워드',
+              width: 140,
+              wrap: true,
+              render: (row) => (
+                <InlineEditableCell
+                  value={row.primaryKeyword ?? ''}
+                  placeholder={'대표 키워드 입력'}
+                  onSave={(nextValue) => onUpdateProduct(row.id, { primaryKeyword: nextValue.trim() })}
+                />
+              )
+            },
+            {
+              key: 'trackingKeywords',
+              title: '추적 키워드',
+              width: 180,
+              wrap: true,
+              render: (row) => (
+                <InlineEditableCell
+                  value={row.trackingKeywords.join(', ')}
+                  placeholder={'쉼표(,)로 구분하여 입력'}
+                  onSave={(nextValue) =>
+                    onUpdateProduct(row.id, {
+                      trackingKeywords: nextValue.split(',').map((item) => item.trim()).filter(Boolean)
+                    })
+                  }
+                />
+              )
+            },
             { key: 'price', title: '가격', width: 110 },
-            { key: 'testStatus', title: '상태', width: 120, render: (row) => <StatusBadge value={row.testStatus} /> }
+            { key: 'naverStatusType', title: '판매상태', width: 110, render: (row) => formatNaverStatusType(row.naverStatusType) },
+            { key: 'testStatus', title: '테스트 상태', width: 120, render: (row) => <StatusBadge value={row.testStatus} /> }
           ]}
           rows={paginatedProducts}
         />
         <div className="pagination-bar">
           <span className="helper-copy">{'전체 ' + filteredProducts.length + '개 중 ' + (filteredProducts.length === 0 ? 0 : (productPage - 1) * productPageSize + 1) + '-' + Math.min(productPage * productPageSize, filteredProducts.length) + '개 표시'}</span>
-          <div className="inline-actions">
-            <button type="button" className="action-button secondary" onClick={() => setProductPage((current) => Math.max(1, current - 1))} disabled={productPage <= 1}>
-              이전 페이지
+          <div className="page-number-list">
+            <button
+              type="button"
+              className="page-number-button"
+              onClick={() => setProductPage(pageWindowStart - 1)}
+              disabled={pageWindowStart <= 1}
+              aria-label="이전 페이지 그룹"
+            >
+              {'<'}
             </button>
-            <span className="helper-copy">{productPage + ' / ' + totalProductPages + ' 페이지'}</span>
-            <button type="button" className="action-button secondary" onClick={() => setProductPage((current) => Math.min(totalProductPages, current + 1))} disabled={productPage >= totalProductPages}>
-              다음 페이지
+            {pageNumbers.map((pageNumber) => (
+              <button
+                type="button"
+                key={pageNumber}
+                className={'page-number-button' + (pageNumber === productPage ? ' active' : '')}
+                onClick={() => setProductPage(pageNumber)}
+              >
+                {pageNumber}
+              </button>
+            ))}
+            <button
+              type="button"
+              className="page-number-button"
+              onClick={() => setProductPage(pageWindowEnd + 1)}
+              disabled={pageWindowEnd >= totalProductPages}
+              aria-label="다음 페이지 그룹"
+            >
+              {'>'}
             </button>
           </div>
         </div>
       </section>
+
+      {excludedProducts.length > 0 ? (
+        <section className="panel">
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow">{'재생성 방지 목록'}</p>
+              <h2>{'삭제 후 제외된 상품 (' + excludedProducts.length + '개)'}</h2>
+              <p className="helper-copy">{'여기 있는 동안은 동기화해도 다시 생성되지 않습니다. 다시 불러오려면 복원하세요.'}</p>
+            </div>
+            <div className="inline-actions">
+              <button type="button" className="action-button secondary" onClick={() => setExcludedListCollapsed((current) => !current)}>
+                {excludedListCollapsed ? '펼치기' : '감추기'}
+              </button>
+            </div>
+          </div>
+          {!excludedListCollapsed && (
+            <>
+              <ul className="excluded-product-list">
+                {paginatedExcludedProducts.map((entry) => (
+                  <li key={entry.id} className="excluded-product-item">
+                    <span className="excluded-product-id">{entry.smartStoreProductId}</span>
+                    <span className="excluded-product-reason">{entry.reason ?? ''}</span>
+                    <button
+                      type="button"
+                      className="action-button secondary"
+                      onClick={async () => {
+                        try {
+                          await onRestoreExcludedProduct(entry.id);
+                          setFeedback({ tone: 'success', message: entry.smartStoreProductId + '을(를) 복원했습니다. 다음 동기화부터 다시 불러옵니다.' });
+                        } catch (error) {
+                          setFeedback({ tone: 'error', message: error instanceof Error ? error.message : '복원에 실패했습니다.' });
+                        }
+                      }}
+                    >
+                      {'복원'}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              {totalExcludedProductPages > 1 && (
+                <div className="pagination-bar">
+                  <span className="helper-copy">
+                    {'전체 ' + excludedProducts.length + '개 중 ' + ((excludedProductPage - 1) * excludedProductPageSize + 1) + '-' + Math.min(excludedProductPage * excludedProductPageSize, excludedProducts.length) + '개 표시'}
+                  </span>
+                  <div className="page-number-list">
+                    {excludedPageNumbers.map((pageNumber) => (
+                      <button
+                        type="button"
+                        key={pageNumber}
+                        className={'page-number-button' + (pageNumber === excludedProductPage ? ' active' : '')}
+                        onClick={() => setExcludedProductPage(pageNumber)}
+                      >
+                        {pageNumber}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </section>
+      ) : null}
 
       {selectedDetailProduct ? (
         <section className="panel product-detail-panel">
@@ -1813,24 +2353,117 @@ function formatDecisionConfidence(value: DecisionProjectionResponse['projection'
   return '낮음';
 }
 
-function ExperimentsView({ experiments, focusExperimentId }: { experiments: SeoExperiment[]; focusExperimentId?: string | null }) {
+function ExperimentsView({
+  experiments,
+  focusExperimentId,
+  onUpdateExperiment,
+  onDeleteProduct
+}: {
+  experiments: SeoExperiment[];
+  focusExperimentId?: string | null;
+  onUpdateExperiment: (experimentId: string, input: UpdateExperimentInput) => Promise<UpdateExperimentResponse>;
+  onDeleteProduct: (productId: string) => Promise<void>;
+}) {
   const [experimentViewMode, setExperimentViewMode] = useState<'ALL' | 'DRAFT_ONLY' | 'FOCUS_ONLY'>(focusExperimentId ? 'FOCUS_ONLY' : 'ALL');
+  const [selectedSettingsId, setSelectedSettingsId] = useState<string | null>(focusExperimentId ?? null);
+  const [settingsForm, setSettingsForm] = useState({ trackingInterval: '30', minObservationHours: 24, notes: '' });
+  const [customIntervalInput, setCustomIntervalInput] = useState('30');
+  const [savingSettings, setSavingSettings] = useState(false);
+  const [settingsFeedback, setSettingsFeedback] = useState<{ tone: 'success' | 'error'; message: string } | null>(null);
+  const [deletingProduct, setDeletingProduct] = useState(false);
+
   const sortedExperiments = [...experiments].sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime());
   const focusExperiment = (focusExperimentId ? sortedExperiments.find((experiment) => experiment.id === focusExperimentId) : null) ?? sortedExperiments[0] ?? null;
   const draftCount = sortedExperiments.filter((experiment) => experiment.status === 'DRAFT').length;
   const runningCount = sortedExperiments.filter((experiment) => experiment.status === 'RUNNING').length;
+  const settingsExperiment = sortedExperiments.find((experiment) => experiment.id === selectedSettingsId) ?? null;
 
   useEffect(() => {
     if (focusExperimentId) {
       setExperimentViewMode('FOCUS_ONLY');
+      setSelectedSettingsId(focusExperimentId);
     }
   }, [focusExperimentId]);
+
+  useEffect(() => {
+    if (settingsExperiment) {
+      const minutes = parseTrackingIntervalMinutes(settingsExperiment.trackingInterval);
+      setSettingsForm({
+        trackingInterval: String(minutes),
+        minObservationHours: settingsExperiment.minObservationHours,
+        notes: settingsExperiment.notes ?? ''
+      });
+      setCustomIntervalInput(String(minutes));
+      setSettingsFeedback(null);
+    }
+  }, [settingsExperiment?.id]);
 
   const filteredExperiments = sortedExperiments.filter((experiment) => {
     if (experimentViewMode === 'DRAFT_ONLY') return experiment.status === 'DRAFT';
     if (experimentViewMode === 'FOCUS_ONLY') return focusExperimentId ? experiment.id === focusExperimentId : true;
     return true;
   });
+
+  async function handleSaveSettings() {
+    if (!settingsExperiment) return;
+    setSavingSettings(true);
+    setSettingsFeedback(null);
+    try {
+      await onUpdateExperiment(settingsExperiment.id, {
+        trackingInterval: settingsForm.trackingInterval,
+        minObservationHours: settingsForm.minObservationHours,
+        notes: settingsForm.notes
+      });
+      setSettingsFeedback({ tone: 'success', message: '설정을 저장했습니다.' });
+    } catch (error) {
+      setSettingsFeedback({ tone: 'error', message: error instanceof Error ? error.message : '설정 저장에 실패했습니다.' });
+    } finally {
+      setSavingSettings(false);
+    }
+  }
+
+  async function handleChangeStatus(status: 'RUNNING' | 'PAUSED' | 'COMPLETED' | 'FAILED') {
+    if (!settingsExperiment) return;
+    setSavingSettings(true);
+    setSettingsFeedback(null);
+    try {
+      const result = await onUpdateExperiment(settingsExperiment.id, { status });
+      if (status === 'RUNNING') {
+        if (!result.hasTrackingKeyword) {
+          setSettingsFeedback({ tone: 'error', message: '연결된 키워드가 없어 추적 작업을 만들지 못했습니다. 상품 상세에서 대표 키워드를 먼저 입력한 뒤 초안을 다시 만들어 주세요.' });
+        } else if ((result.createdJobCount ?? 0) > 0) {
+          const providerNote = result.usedMockProvider
+            ? ' 다만 쇼핑검색 API 계정이 없어 실제 순위가 아닌 임시(MOCK) 값으로 생성됐습니다. API 계정 관리에서 오픈API 쇼핑검색 계정을 등록/활성화한 뒤 실험을 재시작하면 실제 순위로 바뀝니다.'
+            : ' 네이버 오픈API 쇼핑검색으로 실제 가격비교 순위를 조회합니다.';
+          setSettingsFeedback({ tone: result.usedMockProvider ? 'error' : 'success', message: '실험을 시작하고 추적 작업 ' + result.createdJobCount + '개를 생성했습니다.' + providerNote + ' "랭킹 추적 작업" 화면에서 즉시 추적을 실행해 진행 상황을 확인하세요.' });
+        } else {
+          setSettingsFeedback({ tone: 'success', message: '실험을 시작했습니다. (이미 만들어진 추적 작업을 계속 사용합니다)' });
+        }
+      } else {
+        setSettingsFeedback({ tone: 'success', message: '상태를 변경했습니다.' });
+      }
+    } catch (error) {
+      setSettingsFeedback({ tone: 'error', message: error instanceof Error ? error.message : '상태 변경에 실패했습니다.' });
+    } finally {
+      setSavingSettings(false);
+    }
+  }
+
+  async function handleDeleteProductClick() {
+    if (!settingsExperiment) return;
+    const confirmed = window.confirm(settingsExperiment.beforeTitle + ' 상품을 추적 목록에서 삭제하시겠습니까? (네이버 실제 상품에는 영향을 주지 않습니다)');
+    if (!confirmed) return;
+
+    try {
+      setDeletingProduct(true);
+      await onDeleteProduct(settingsExperiment.productId);
+      setSelectedSettingsId(null);
+    } catch (error) {
+      setSettingsFeedback({ tone: 'error', message: error instanceof Error ? error.message : '상품 삭제에 실패했습니다.' });
+    } finally {
+      setDeletingProduct(false);
+    }
+  }
 
   return (
     <section className="panel">
@@ -1864,7 +2497,7 @@ function ExperimentsView({ experiments, focusExperimentId }: { experiments: SeoE
           { key: "name", title: "실험명", width: 220, sticky: true },
           { key: "beforeTitle", title: "변경 전 제목", width: 240 },
           { key: "afterTitle", title: "변경 후 제목", width: 280 },
-          { key: "trackingInterval", title: "주기", width: 120 },
+          { key: "trackingInterval", title: "주기", width: 120, render: (row) => formatTrackingIntervalLabel(row.trackingInterval) },
           {
             key: "status",
             title: "상태",
@@ -1877,21 +2510,167 @@ function ExperimentsView({ experiments, focusExperimentId }: { experiments: SeoE
             width: 120,
             render: (row) => <StatusBadge value={row.judgement} />
           },
-          { key: "summary", title: "요약", width: 240, render: (row) => row.id === focusExperimentId ? "방금 만든 초안" : (row.summary ?? "-") }
+          { key: "summary", title: "요약", width: 240, render: (row) => row.id === focusExperimentId ? "방금 만든 초안" : (row.summary ?? "-") },
+          {
+            key: "actions",
+            title: "설정",
+            width: 100,
+            sticky: true,
+            render: (row) => (
+              <button type="button" className="action-button secondary" onClick={() => setSelectedSettingsId(row.id)}>
+                {'설정'}
+              </button>
+            )
+          }
         ]}
         rows={filteredExperiments}
       />
+
+      {settingsExperiment ? (
+        <div className="type-guide-card experiment-settings-card">
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow">{'실험 설정'}</p>
+              <h3>{settingsExperiment.name}</h3>
+              <p className="helper-copy">{'현재 상태: ' + settingsExperiment.status + ' / 판단: ' + settingsExperiment.judgement}</p>
+            </div>
+          </div>
+
+          <div className="inline-actions experiment-filter-actions">
+            <button type="button" className="action-button" onClick={() => void handleChangeStatus('RUNNING')} disabled={savingSettings || settingsExperiment.status === 'RUNNING' || settingsExperiment.status === 'COMPLETED'}>
+              {'시작'}
+            </button>
+            <button type="button" className="action-button secondary" onClick={() => void handleChangeStatus('PAUSED')} disabled={savingSettings || settingsExperiment.status !== 'RUNNING'}>
+              {'일시정지'}
+            </button>
+            <button type="button" className="action-button secondary" onClick={() => void handleChangeStatus('COMPLETED')} disabled={savingSettings || settingsExperiment.status === 'COMPLETED'}>
+              {'완료 처리'}
+            </button>
+            <button type="button" className="action-button danger" onClick={() => void handleChangeStatus('FAILED')} disabled={savingSettings || settingsExperiment.status === 'COMPLETED' || settingsExperiment.status === 'FAILED'}>
+              {'실패 처리'}
+            </button>
+          </div>
+
+          <label className="product-detail-item">
+            <span>{'추적 주기'}</span>
+            <select
+              value={TRACKING_INTERVAL_PRESETS_MINUTES.includes(Number(settingsForm.trackingInterval)) ? settingsForm.trackingInterval : 'CUSTOM'}
+              onChange={(event) => {
+                const value = event.target.value;
+                if (value === 'CUSTOM') {
+                  setSettingsForm((current) => ({ ...current, trackingInterval: customIntervalInput }));
+                } else {
+                  setSettingsForm((current) => ({ ...current, trackingInterval: value }));
+                }
+              }}
+            >
+              {TRACKING_INTERVAL_PRESETS_MINUTES.map((minutes) => (
+                <option key={minutes} value={String(minutes)}>{formatTrackingIntervalLabel(String(minutes))}</option>
+              ))}
+              <option value="CUSTOM">{'수동 설정 (분)'}</option>
+            </select>
+          </label>
+
+          {!TRACKING_INTERVAL_PRESETS_MINUTES.includes(Number(settingsForm.trackingInterval)) ? (
+            <label className="product-detail-item">
+              <span>{'수동 주기 (분 단위)'}</span>
+              <input
+                type="number"
+                min={1}
+                value={customIntervalInput}
+                onChange={(event) => {
+                  const nextValue = event.target.value;
+                  setCustomIntervalInput(nextValue);
+                  const minutes = Math.max(1, Number(nextValue) || 1);
+                  setSettingsForm((current) => ({ ...current, trackingInterval: String(minutes) }));
+                }}
+              />
+              <span className="helper-copy">{'예: 90분, 45분처럼 프리셋에 없는 주기를 직접 입력할 수 있습니다.'}</span>
+            </label>
+          ) : null}
+
+          <label className="product-detail-item">
+            <span>{'최소 관찰 시간 (시간)'}</span>
+            <input
+              type="number"
+              min={1}
+              value={settingsForm.minObservationHours}
+              onChange={(event) => setSettingsForm((current) => ({ ...current, minObservationHours: Math.max(1, Number(event.target.value) || 1) }))}
+            />
+          </label>
+
+          <label className="product-detail-item">
+            <span>{'메모'}</span>
+            <textarea
+              value={settingsForm.notes}
+              onChange={(event) => setSettingsForm((current) => ({ ...current, notes: event.target.value }))}
+              placeholder={'실험 진행 메모를 입력하세요'}
+            />
+          </label>
+
+          {settingsFeedback ? (
+            <p className={settingsFeedback.tone === 'success' ? 'helper-copy success-text' : 'helper-copy error-text'}>{settingsFeedback.message}</p>
+          ) : null}
+
+          <div className="inline-actions">
+            <button type="button" className="action-button" onClick={() => void handleSaveSettings()} disabled={savingSettings}>
+              {savingSettings ? '저장 중...' : '설정 저장'}
+            </button>
+            <button type="button" className="action-button secondary" onClick={() => setSelectedSettingsId(null)}>
+              {'닫기'}
+            </button>
+            <button type="button" className="action-button danger" onClick={() => void handleDeleteProductClick()} disabled={deletingProduct}>
+              {deletingProduct ? '삭제 중...' : '상품 삭제하기'}
+            </button>
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }
+
+const DELTA_STATUS_ALERT_LABELS: Record<string, string> = {
+  UP: "상승",
+  DOWN: "하락",
+  SAME: "유지",
+  OUT: "이탈(순위 밖)"
+};
 
 function TrackingJobsView({
   jobs,
   onRunJob
 }: {
   jobs: RankTrackingJob[];
-  onRunJob: (jobId: string) => Promise<void>;
+  onRunJob: (jobId: string) => Promise<RunTrackingJobResponse>;
 }) {
+  const [runningJobId, setRunningJobId] = useState<string | null>(null);
+
+  async function handleRunClick(job: RankTrackingJob) {
+    setRunningJobId(job.id);
+    try {
+      const response = await onRunJob(job.id);
+      const result = response.result;
+
+      if (!result) {
+        window.alert('"' + job.keyword + '" 추적 작업이 비활성 상태라 실행되지 않았습니다.');
+        return;
+      }
+
+      const rankText = typeof result.currentRank === "number" ? result.currentRank + "위" : "순위 밖(이탈)";
+      const deltaLabel = DELTA_STATUS_ALERT_LABELS[result.deltaStatus] ?? result.deltaStatus;
+      window.alert(
+        '"' + job.keyword + '" 즉시 추적 완료\n' +
+          '현재 순위: ' + rankText + '\n' +
+          '상태: ' + deltaLabel + '\n' +
+          '추적 시각: ' + formatDateTime(result.trackedAt)
+      );
+    } catch (error) {
+      window.alert('"' + job.keyword + '" 즉시 추적 실패\n' + (error instanceof Error ? error.message : "알 수 없는 오류가 발생했습니다."));
+    } finally {
+      setRunningJobId(null);
+    }
+  }
+
   return (
     <section className="panel">
       <div className="section-heading">
@@ -1904,7 +2683,7 @@ function TrackingJobsView({
         columns={[
           { key: "keyword", title: "키워드", width: 180, sticky: true },
           { key: "provider", title: "제공처", width: 140 },
-          { key: "interval", title: "주기", width: 120 },
+          { key: "interval", title: "주기", width: 120, render: (row) => formatTrackingIntervalLabel(row.interval) },
           {
             key: "status",
             title: "상태",
@@ -1917,8 +2696,8 @@ function TrackingJobsView({
             title: "실행",
             width: 120,
             render: (row) => (
-              <button type="button" className="action-button" onClick={() => void onRunJob(row.id)}>
-                즉시 추적
+              <button type="button" className="action-button" onClick={() => void handleRunClick(row)} disabled={runningJobId === row.id}>
+                {runningJobId === row.id ? "추적 중..." : "즉시 추적"}
               </button>
             )
           }
@@ -1930,6 +2709,77 @@ function TrackingJobsView({
 }
 
 function ResultsView({ results, products }: { results: RankTrackingResult[]; products: Product[] }) {
+  const [resultProductFilter, setResultProductFilter] = useState<string>("ALL");
+  const [resultKeywordQuery, setResultKeywordQuery] = useState("");
+  const [resultStatusFilter, setResultStatusFilter] = useState<string>("ALL");
+  const [resultPage, setResultPage] = useState(1);
+  const [resultPageSize, setResultPageSize] = useState(10);
+
+  // 결과가 있는 상품 + 현재 진행 중인 실험의 상품을 모두 필터 옵션으로 보여준다.
+  // (결과만 기준으로 하면, 막 시작해서 아직 추적 결과가 하나도 없는 진행중 실험의
+  // 상품은 필터 드롭다운에 아예 나타나지 않는 문제가 있었다.)
+  const resultProductIds = new Set(results.map((result) => result.productId));
+  for (const product of products) {
+    if (product.testStatus === "RUNNING") {
+      resultProductIds.add(product.id);
+    }
+  }
+  const resultProductOptions = Array.from(resultProductIds)
+    .map((productId) => ({ id: productId, title: products.find((product) => product.id === productId)?.currentTitle ?? productId }))
+    .sort((left, right) => left.title.localeCompare(right.title, "ko"));
+
+  const filteredResults = results.filter((result) => {
+    const matchesProduct = resultProductFilter === "ALL" || result.productId === resultProductFilter;
+    const matchesKeyword = resultKeywordQuery.trim().length === 0 || result.keyword.toLowerCase().includes(resultKeywordQuery.trim().toLowerCase());
+    const matchesStatus = resultStatusFilter === "ALL" || result.deltaStatus === resultStatusFilter;
+    return matchesProduct && matchesKeyword && matchesStatus;
+  });
+
+  // 추적이 오래될수록 결과 리스트가 무한정 길어지므로, 상품목록과 동일하게
+  // 페이지당 개수를 정해서 나눠 보여준다.
+  const totalResultPages = Math.max(1, Math.ceil(filteredResults.length / resultPageSize));
+  const paginatedResults = filteredResults.slice((resultPage - 1) * resultPageSize, (resultPage - 1) * resultPageSize + resultPageSize);
+  const resultPageWindowSize = 10;
+  const resultPageWindowStart = Math.floor((resultPage - 1) / resultPageWindowSize) * resultPageWindowSize + 1;
+  const resultPageWindowEnd = Math.min(resultPageWindowStart + resultPageWindowSize - 1, totalResultPages);
+  const resultPageNumbers = Array.from({ length: resultPageWindowEnd - resultPageWindowStart + 1 }, (_, index) => resultPageWindowStart + index);
+
+  useEffect(() => {
+    setResultPage(1);
+  }, [resultProductFilter, resultKeywordQuery, resultStatusFilter, resultPageSize]);
+
+  useEffect(() => {
+    setResultPage((current) => Math.min(current, totalResultPages));
+  }, [totalResultPages]);
+
+  const trendOptions = Array.from(
+    new Map(
+      results.map((result) => {
+        const productTitle = products.find((product) => product.id === result.productId)?.currentTitle ?? result.productId;
+        const value = result.productId + "::" + result.keyword;
+        return [value, { value, label: result.keyword + " · " + productTitle, keyword: result.keyword, productId: result.productId }];
+      })
+    ).values()
+  ).sort((left, right) => left.label.localeCompare(right.label, "ko"));
+
+  const [selectedTrendKey, setSelectedTrendKey] = useState<string>(trendOptions[0]?.value ?? "");
+
+  useEffect(() => {
+    const firstOption = trendOptions[0];
+    if (firstOption && !trendOptions.some((option) => option.value === selectedTrendKey)) {
+      setSelectedTrendKey(firstOption.value);
+    }
+  }, [trendOptions.map((option) => option.value).join(","), selectedTrendKey]);
+
+  const selectedTrendOption = trendOptions.find((option) => option.value === selectedTrendKey) ?? null;
+  const trendPoints = selectedTrendOption
+    ? results
+        .filter((result) => result.productId === selectedTrendOption.productId && result.keyword === selectedTrendOption.keyword)
+        .slice()
+        .sort((left, right) => new Date(left.trackedAt).getTime() - new Date(right.trackedAt).getTime())
+        .map((result) => ({ trackedAt: result.trackedAt, currentRank: result.currentRank ?? null }))
+    : [];
+
   return (
     <section className="panel">
       <div className="section-heading">
@@ -1937,19 +2787,110 @@ function ResultsView({ results, products }: { results: RankTrackingResult[]; pro
           <p className="eyebrow">실측 결과</p>
           <h2>랭킹 추적 결과</h2>
         </div>
+        <div className="report-filters product-filter-grid">
+          <label className="page-size-field">
+            <span>{'상품'}</span>
+            <select value={resultProductFilter} onChange={(event) => setResultProductFilter(event.target.value)}>
+              <option value="ALL">{'전체'}</option>
+              {resultProductOptions.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.title}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="page-size-field">
+            <span>{'키워드 검색'}</span>
+            <input
+              type="text"
+              value={resultKeywordQuery}
+              onChange={(event) => setResultKeywordQuery(event.target.value)}
+              placeholder={'키워드 검색'}
+            />
+          </label>
+          <label className="page-size-field">
+            <span>{'상태'}</span>
+            <select value={resultStatusFilter} onChange={(event) => setResultStatusFilter(event.target.value)}>
+              <option value="ALL">{'전체'}</option>
+              <option value="UP">{'상승'}</option>
+              <option value="DOWN">{'하락'}</option>
+              <option value="SAME">{'유지'}</option>
+              <option value="OUT">{'이탈'}</option>
+            </select>
+          </label>
+          <label className="page-size-field">
+            <span>{'표시 개수'}</span>
+            <select value={resultPageSize} onChange={(event) => setResultPageSize(Number(event.target.value))}>
+              <option value={10}>10개</option>
+              <option value={20}>20개</option>
+              <option value={50}>50개</option>
+              <option value={100}>100개</option>
+            </select>
+          </label>
+        </div>
       </div>
+
+      {trendOptions.length > 0 && (
+        <div className="type-guide-card rank-trend-card">
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow">{'순위 변화 그래프'}</p>
+              <h3>{'키워드별 순위 추이'}</h3>
+            </div>
+            <label className="page-size-field">
+              <span>{'키워드 선택'}</span>
+              <select value={selectedTrendKey} onChange={(event) => setSelectedTrendKey(event.target.value)}>
+                {trendOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <RankTrendChart points={trendPoints} />
+        </div>
+      )}
+
       <DataGrid
         columns={[
-          { key: "keyword", title: "키워드", width: 180, sticky: true },
           {
             key: "productId",
             title: "상품",
             width: 260,
+            sticky: true,
             render: (row) => products.find((product) => product.id === row.productId)?.currentTitle ?? row.productId
           },
+          {
+            key: "keyword",
+            title: "키워드",
+            width: 180,
+            render: (row) => (
+              <a
+                href={buildNaverShoppingSearchUrl(row.keyword)}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-link-button"
+                title={'네이버쇼핑에서 "' + row.keyword + '" 검색 결과 보기'}
+                onClick={(event) => event.stopPropagation()}
+              >
+                {row.keyword}
+              </a>
+            )
+          },
           { key: "trackedAt", title: "추적 시각", width: 180 },
-          { key: "currentRank", title: "현재 순위", width: 120 },
-          { key: "previousRank", title: "이전 순위", width: 120 },
+          {
+            key: "currentRank",
+            title: "현재 순위",
+            width: 130,
+            render: (row) => formatRankWithPage(row.currentRank, row.searchPage)
+          },
+          {
+            key: "previousRank",
+            title: "이전 순위",
+            width: 130,
+            render: (row) => formatRankWithPage(row.previousRank)
+          },
           { key: "delta", title: "변화량", width: 100 },
           {
             key: "deltaStatus",
@@ -1959,8 +2900,41 @@ function ResultsView({ results, products }: { results: RankTrackingResult[]; pro
           },
           { key: "foundTitle", title: "발견 상품명", width: 280 }
         ]}
-        rows={results}
+        rows={paginatedResults}
       />
+      <div className="pagination-bar">
+        <span className="helper-copy">{'전체 ' + filteredResults.length + '개 중 ' + (filteredResults.length === 0 ? 0 : (resultPage - 1) * resultPageSize + 1) + '-' + Math.min(resultPage * resultPageSize, filteredResults.length) + '개 표시'}</span>
+        <div className="page-number-list">
+          <button
+            type="button"
+            className="page-number-button"
+            onClick={() => setResultPage(resultPageWindowStart - 1)}
+            disabled={resultPageWindowStart <= 1}
+            aria-label="이전 페이지 그룹"
+          >
+            {'<'}
+          </button>
+          {resultPageNumbers.map((pageNumber) => (
+            <button
+              type="button"
+              key={pageNumber}
+              className={'page-number-button' + (pageNumber === resultPage ? ' active' : '')}
+              onClick={() => setResultPage(pageNumber)}
+            >
+              {pageNumber}
+            </button>
+          ))}
+          <button
+            type="button"
+            className="page-number-button"
+            onClick={() => setResultPage(resultPageWindowEnd + 1)}
+            disabled={resultPageWindowEnd >= totalResultPages}
+            aria-label="다음 페이지 그룹"
+          >
+            {'>'}
+          </button>
+        </div>
+      </div>
     </section>
   );
 }
@@ -2462,7 +3436,7 @@ function ReportsView({ snapshot }: { snapshot: AppSnapshot }) {
                 width: 120,
                 render: (row) => <StatusBadge value={row.judgement} />
               },
-              { key: "trackingInterval", title: "주기", width: 120 },
+              { key: "trackingInterval", title: "주기", width: 120, render: (row) => formatTrackingIntervalLabel(row.trackingInterval) },
               { key: "keywordCount", title: "키워드 수", width: 110 },
               { key: "latestRank", title: "최신 순위", width: 110 },
               { key: "avgDelta", title: "평균 변화량", width: 120 },
@@ -2869,7 +3843,7 @@ function buildExperimentCsv(rows: ExperimentReportRow[], filterSummaryRows: Arra
     row.productTitle,
     row.status,
     row.judgement,
-    row.trackingInterval,
+    formatTrackingIntervalLabel(row.trackingInterval),
     row.keywordCount,
     row.latestRank,
     row.avgDelta,
@@ -3068,6 +4042,15 @@ function buildFormReadinessPreview(input: ApiAccountFormInput, editingAccount?: 
     };
   }
 
+  if (input.type === "SHOPPING_SEARCH" && missingFields.length === 0) {
+    return {
+      state: "LIVE_READY",
+      title: "이 계정은 바로 저장 후 실제 쇼핑검색 연결 테스트를 실행할 수 있습니다.",
+      caption: editingAccount ? "저장된 비밀값을 유지하거나 새 값으로 교체할 수 있습니다." : "쇼핑검색 필수 항목이 모두 입력되었습니다.",
+      missingFields
+    };
+  }
+
   if (missingFields.length === 0) {
     return {
       state: "VALIDATION_READY",
@@ -3134,6 +4117,10 @@ function getAccountReadinessState(account: ApiAccount): AccountReadinessState {
     return "LIVE_READY";
   }
 
+  if (account.type === "SHOPPING_SEARCH" && isValidationReadyAccount(account)) {
+    return "LIVE_READY";
+  }
+
   if (isValidationReadyAccount(account)) {
     return "VALIDATION_READY";
   }
@@ -3153,6 +4140,12 @@ function getAccountReadinessHint(account: ApiAccount) {
   if (account.type === "COMMERCE") {
     return isValidationReadyAccount(account)
       ? "실제 커머스 테스트 및 상품 불러오기 가능"
+      : `누락: ${missingFields.join(", ")}`;
+  }
+
+  if (account.type === "SHOPPING_SEARCH") {
+    return isValidationReadyAccount(account)
+      ? "실제 쇼핑검색 순위 조회 테스트 가능"
       : `누락: ${missingFields.join(", ")}`;
   }
 
@@ -3230,28 +4223,28 @@ function buildAccountLogFocusCards(logs: AccountTestLogViewRow[]): AccountLogFoc
 
   return [
     {
-      label: "검증 가능",
+      label: "실패",
       value: failedCount,
       caption: failedCount > 0 ? "자격정보 또는 연결 오류를 먼저 확인하세요." : "최근 로그 구간에 실패 내역이 없습니다.",
       toneClass: "failed",
       filterValue: "FAILED"
     },
     {
-      label: "검증 가능",
+      label: "성공",
       value: successCount,
       caption: successCount > 0 ? "최근 연결 점검이 정상 완료되었습니다." : "아직 최근 성공 점검 기록이 없습니다.",
       toneClass: "success",
       filterValue: "SUCCESS"
     },
     {
-      label: "저장된 계정",
+      label: "실연동 실행",
       value: realCount,
       caption: realCount > 0 ? "실제 외부 API 점검이 실행되었습니다." : "최근 로그 구간에 실연동 테스트가 없습니다.",
       toneClass: "info",
       filterValue: "REAL"
     },
     {
-      label: "검증 가능",
+      label: "검증 모드",
       value: validationCount,
       caption: "운영 자격정보 적용 전 검증용으로 활용됩니다.",
       toneClass: "warning",
@@ -3371,6 +4364,22 @@ function formatParsedProductImportMeta(parsed: ParsedProductImportMeta, fallback
 
 function isApiAccountLogFailure(level: string) {
   return ["ERROR", "FAILED", "WARN"].includes(level.toUpperCase());
+}
+
+function buildNaverShoppingSearchUrl(keyword: string) {
+  return "https://search.shopping.naver.com/search/all?query=" + encodeURIComponent(keyword);
+}
+
+// 네이버 가격비교는 한 페이지에 40개씩 상품이 노출된다. 순위와 함께 몇 페이지에
+// 있는지도 보여주면 실제 검색 결과에서 얼마나 더 찾아 내려가야 하는지 감을 잡기 쉽다.
+// searchPage 값이 이미 저장돼 있으면(현재 순위) 그 값을 쓰고, 없으면(이전 순위 등)
+// 순위로부터 직접 계산한다.
+function formatRankWithPage(rank: number | null | undefined, searchPage?: number | null) {
+  if (rank === null || rank === undefined) {
+    return "-";
+  }
+  const page = searchPage ?? Math.ceil(rank / 40);
+  return `${rank}위 / ${page}P`;
 }
 
 function formatDateTime(value: string) {

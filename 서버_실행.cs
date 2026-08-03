@@ -7,8 +7,8 @@ using System.Windows.Forms;
 
 class ServerLauncher
 {
-    static readonly string RepoDir = @"D:\Codex\NaverNameSeoTracker";
-    static readonly string EngineDir = @"D:\Claude\MonteCarloDecisionEngine";
+    static readonly string RepoDir = @"C:\work\NaverNameSeoTracker";
+    static readonly string EngineDir = @"C:\work\MontecarloEngine";
     static readonly string LogDir = RepoDir + @"\logs";
 
     [STAThread]

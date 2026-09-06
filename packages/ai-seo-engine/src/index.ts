@@ -12,6 +12,7 @@ export * from "./scoring/confidence-score.js";
 // LLM 추상화
 export * from "./llm/llm-provider.interface.js";
 export * from "./llm/mock-llm-provider.js";
+export { AnthropicLlmProvider, type AnthropicLlmProviderOptions } from "./llm/anthropic-llm-provider.js";
 
 // Semantic Analyzer (필수 구현)
 export * from "./semantic/semantic-types.js";
@@ -48,14 +49,21 @@ export {
 } from "./ranking/correlation-analyzer.js";
 export { RankingChangeDetector, type RankingChangeDetectorOptions } from "./ranking/ranking-change-detector.js";
 
-// Review Intelligence (인터페이스만)
+// Review Intelligence (규칙 기반 구현 + 인터페이스)
 export * from "./reviews/review-types.js";
 export * from "./reviews/review-intelligence.interface.js";
+export * from "./reviews/review-rules.js";
+export { RuleBasedReviewIntelligence, type ReviewIntelligenceOptions } from "./reviews/review-intelligence.js";
 
 // Authority Score (인터페이스만)
 export * from "./authority/authority-types.js";
 export * from "./authority/authority-score.interface.js";
 
-// Monte Carlo Predictor (인터페이스만)
+// Monte Carlo Predictor (인터페이스 + rw_decision_engine HTTP 어댑터)
 export * from "./prediction/predictor-types.js";
 export * from "./prediction/monte-carlo-predictor.interface.js";
+export {
+  MonteCarloHttpAdapter,
+  type MonteCarloHttpAdapterOptions,
+  type NaverSeoSimulationContext
+} from "./prediction/monte-carlo-http-adapter.js";

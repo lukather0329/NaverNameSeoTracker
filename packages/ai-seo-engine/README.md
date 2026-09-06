@@ -99,13 +99,43 @@ console.log(result.recommendations); // 무엇을 고치면 좋을지
 - 출력: `AnalysisResult<RankingChangeDetails>` — before/after 통계, trend, 변화점, `candidateCauses`(이벤트별 상관점수/신뢰도/지연시간/설명), `warnings`
 - `splitAt`을 생략하면 `changeEvents` 중 가장 이른 이벤트 시각을 기준으로 전/후를 나눕니다.
 
+### 4.4-a Review Intelligence (`RuleBasedReviewIntelligence`)
+
+리뷰 배열을 규칙 기반으로 분석합니다(감정 추정, 주제 추출, 짧은 리뷰/중복 리뷰 감지, FAQ 후보,
+개선 요구사항 추출). 별점이 있으면 별점 기준, 없으면 키워드 매칭으로 감정을 추정합니다 —
+정교한 NLP 감정분석 모델이 아니라 단순 휴리스틱입니다.
+
+- 입력: `ReviewInput[]` (비어 있지 않아야 함)
+- 출력: `AnalysisResult<ReviewIntelligenceDetails>`
+- `mentionedAttributes`는 아직 채우지 않습니다(상품 속성 목록과 매칭하는 로직은 향후 과제).
+
+### 4.4-b Monte Carlo Predictor (`MonteCarloHttpAdapter`)
+
+기존 `rw_decision_engine`(Python/FastAPI, 별도 저장소 `D:\Claude\MonteCarloDecisionEngine`,
+기본 포트 8765)의 `/naver-seo/simulate` 엔드포인트를 실제로 호출하는 HTTP 어댑터입니다.
+그 엔드포인트는 "상품명 변경 1건"만 시뮬레이션하므로:
+
+- `action: "CHANGE_PRODUCT_NAME"` 시나리오 + `predict(scenarios, context)`의 `context`(`NaverSeoSimulationContext`:
+  productId/keyword/baseline/titleScoreBefore/titleScoreAfter)가 모두 있으면 실제 엔진을 호출합니다.
+- 그 외 액션 타입이나 context가 없는 경우에는 호출자가 제공한 `estimatedImpactRange`/
+  `probabilityDistribution`을 정규분포 근사로 변환한 추정치를 반환하고, `assumptions`에
+  "실제 시뮬레이션이 아님"을 명시합니다. 엔진 호출이 실패해도 같은 방식으로 안전하게 대체됩니다.
+
+```ts
+import { MonteCarloHttpAdapter } from "@makeware/ai-seo-engine";
+
+const predictor = new MonteCarloHttpAdapter({ baseUrl: "http://127.0.0.1:8765" });
+const prediction = await predictor.predict(
+  [{ action: "CHANGE_PRODUCT_NAME", estimatedImpactRange: { min: -0.05, max: 0.15 } }],
+  { productId, keyword, baseline: { rankHistory, price }, titleScoreBefore: 60, titleScoreAfter: 80 }
+);
+```
+
 ### 4.5 인터페이스만 설계된 엔진 (미구현)
 
 | 엔진 | 위치 | 상태 |
 |---|---|---|
-| Review Intelligence | `src/reviews/` | 인터페이스 + 타입만 정의 |
 | Authority Score | `src/authority/` | 인터페이스 + 타입만 정의 |
-| Monte Carlo Predictor | `src/prediction/` | 인터페이스 + 타입만 정의 (기존 `rw_decision_engine` HTTP 연동 또는 재구현으로 채울 수 있음) |
 
 ## 5. 공통 결과 구조
 
@@ -191,6 +221,15 @@ LLM 결과(`additionalFindings`/`additionalRecommendations`)는 규칙 기반 �
 LLM 호출이 실패해도 규칙 기반 분석 결과는 정상 반환됩니다.
 
 테스트/데모용으로 `MockLlmProvider`, 완전히 비활성화하려면 `NoopLlmProvider`를 제공합니다.
+실제 Anthropic Claude 연동은 `AnthropicLlmProvider`로 이미 구현되어 있습니다 (API 키를
+생성자 파라미터로 받을 뿐, 내부에 저장/캐시하지 않습니다):
+
+```ts
+import { AnthropicLlmProvider, SemanticAnalyzer } from "@makeware/ai-seo-engine";
+
+const llmProvider = new AnthropicLlmProvider({ apiKey: process.env.ANTHROPIC_API_KEY! });
+const analyzer = new SemanticAnalyzer({ llmProvider });
+```
 
 ## 11. NaverNameSeoTracker에 연결하는 방법
 
@@ -198,29 +237,35 @@ LLM 호출이 실패해도 규칙 기반 분석 결과는 정상 반환됩니다
 쓸 수 있습니다.
 
 ```ts
-// apps/server/src/services/*.ts (예시, 아직 실제로 연결하지 않았습니다)
+// apps/server/src/routes/index.ts (실제 코드)
 import { SemanticAnalyzer } from "@makeware/ai-seo-engine";
 
-const semanticAnalyzer = new SemanticAnalyzer();
-const result = await semanticAnalyzer.analyze({
-  productName: product.currentTitle,
-  primaryKeyword와 관련 필드는 Prisma Product 모델 필드에서 매핑
+const analyzer = new SemanticAnalyzer();
+const result = await analyzer.analyze({
+  productName: productRecord.seoOptimizedTitle?.trim() || productRecord.currentTitle,
+  category: productRecord.category ?? undefined,
+  targetKeywords: [productRecord.primaryKeyword, ...trackingKeywords].filter(Boolean)
 });
 ```
 
-1. `apps/server/package.json`의 `dependencies`에 `"@makeware/ai-seo-engine": "0.1.0"` 추가
-2. 새 라우트(예: `POST /products/:id/semantic-analysis`)에서 `SemanticAnalyzer`/`ContentQualityAnalyzer`를 호출
-3. Ranking Change Detector에는 기존 `RankTrackingResult` 테이블 데이터를 `RankObservation[]` 형태로,
-   `TitleChangeLog`/실험 데이터를 `ChangeEvent[]` 형태로 매핑해서 전달
-4. Experiment Manager는 기존 `SeoExperiment` Prisma 모델과 필드가 유사하지만 동일하지 않습니다 —
-   Prisma 모델 ↔ 이 패키지의 `SeoExperiment` 타입 간 매핑 어댑터가 필요합니다 (자동 변환 없음)
+**실제로 연결되어 있습니다** (`apps/server/package.json`의 dependencies에 `@makeware/ai-seo-engine`
+추가 완료, `apps/server/src/services/ai-seo-engine-adapter.ts`에 Prisma ↔ 엔진 타입 매핑 존재):
 
-**주의**: 이번 작업에서는 실제 연결 코드를 작성하지 않았습니다. 화면 개발/네이버 API 연동보다
-엔진 라이브러리 자체를 먼저 완성하는 것이 이번 범위였습니다.
+- `POST /api/products/:id/semantic-analysis` — `SemanticAnalyzer` 호출
+- `POST /api/products/:id/content-quality-analysis` — 네이버 원상품의 `detailContent`를 실시간
+  조회해 `ContentQualityAnalyzer`로 분석 (`fetchNaverOriginProduct` 재사용)
+- `POST /api/products/:id/ranking-change-analysis` — `RankTrackingResult`/`TitleChangeLog`를
+  `ai-seo-engine-adapter.ts`의 매핑 함수로 변환해 `RankingChangeDetector` 호출
+
+Experiment Manager는 기존 `SeoExperiment` Prisma 모델과 필드가 유사하지만 동일하지 않습니다 —
+Prisma 모델 ↔ 이 패키지의 `SeoExperiment` 타입 간 매핑 어댑터는 아직 없습니다 (자동 변환 없음,
+다음 작업 대상).
 
 ## 12. 향후 개발 항목
 
-- Review Intelligence 실제 구현 (감정 분석, 주제 추출, FAQ 후보 등)
+- Experiment Manager Prisma 매핑 어댑터 (다른 3개 엔진처럼 아직 연결 안 됨)
+- Review Intelligence용 실제 리뷰 데이터 소스 확정 (네이버 커머스 API에 리뷰 조회 엔드포인트가
+  있는지 미확인 — 분석 로직 자체는 `RuleBasedReviewIntelligence`로 이미 구현됨)
 - Authority Score 실제 구현 (카테고리 집중도, 브랜드 일관성 등)
 - Monte Carlo Predictor 구현 — 이미 존재하는 `rw_decision_engine`(Python/FastAPI, `D:\Claude\MonteCarloDecisionEngine`)의
   시뮬레이션 결과를 이 인터페이스 형태로 매핑하는 어댑터로 연결하는 것을 권장

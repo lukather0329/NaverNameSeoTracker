@@ -7,8 +7,10 @@ import { getDashboardSummary } from "../services/dashboard-service.js";
 import { runDecisionProjection } from "../services/decision-engine-service.js";
 import { testNaverApiConnection } from "../services/naver-api-test-service.js";
 import { importProductsFromCommerceAccount } from "../services/naver-commerce-product-import-service.js";
-import { publishProductTitleToNaver } from "../services/naver-product-publish-service.js";
+import { fetchNaverOriginProduct, publishProductTitleToNaver } from "../services/naver-product-publish-service.js";
 import { findActiveShoppingSearchCredentials, runTrackingJob } from "../services/rank-tracking-service.js";
+import { ContentQualityAnalyzer, RankingChangeDetector, SemanticAnalyzer } from "@makeware/ai-seo-engine";
+import { mapRankTrackingResultsToObservations, mapTitleChangeLogsToChangeEvents } from "../services/ai-seo-engine-adapter.js";
 
 const router = Router();
 
@@ -551,6 +553,112 @@ router.post("/products/:id/decision-projection", async (req, res) => {
       }
     });
 
+    res.status(502).json({ ok: false, message });
+  }
+});
+
+router.post("/products/:id/semantic-analysis", async (req, res) => {
+  const productRecord = await prisma.product.findUnique({ where: { id: req.params.id } });
+
+  if (!productRecord) {
+    res.status(404).json({ ok: false, message: "상품을 찾을 수 없습니다." });
+    return;
+  }
+
+  try {
+    const analyzer = new SemanticAnalyzer();
+    const trackingKeywords = productRecord.trackingKeywords.split(",").filter(Boolean);
+    const result = await analyzer.analyze({
+      productName: productRecord.seoOptimizedTitle?.trim() || productRecord.currentTitle,
+      category: productRecord.category ?? undefined,
+      targetKeywords: [productRecord.primaryKeyword, ...trackingKeywords].filter(
+        (value): value is string => Boolean(value?.trim())
+      )
+    });
+    res.json({ ok: true, result });
+  } catch (caught) {
+    const message = caught instanceof Error ? caught.message : "상품명 분석에 실패했습니다.";
+    res.status(502).json({ ok: false, message });
+  }
+});
+
+router.post("/products/:id/content-quality-analysis", async (req, res) => {
+  const productRecord = await prisma.product.findUnique({ where: { id: req.params.id } });
+
+  if (!productRecord) {
+    res.status(404).json({ ok: false, message: "상품을 찾을 수 없습니다." });
+    return;
+  }
+
+  try {
+    const { payload } = await fetchNaverOriginProduct(productRecord);
+    const html = payload.originProduct?.detailContent;
+
+    if (!html) {
+      res.status(502).json({ ok: false, message: "네이버 상품에서 상세페이지 HTML을 가져오지 못했습니다." });
+      return;
+    }
+
+    const analyzer = new ContentQualityAnalyzer();
+    const trackingKeywords = productRecord.trackingKeywords.split(",").filter(Boolean);
+    const result = await analyzer.analyze({
+      html,
+      productName: productRecord.seoOptimizedTitle?.trim() || productRecord.currentTitle,
+      category: productRecord.category ?? undefined,
+      targetKeywords: [productRecord.primaryKeyword, ...trackingKeywords].filter(
+        (value): value is string => Boolean(value?.trim())
+      )
+    });
+    res.json({ ok: true, result });
+  } catch (caught) {
+    const message = caught instanceof Error ? caught.message : "상세페이지 분석에 실패했습니다.";
+    res.status(502).json({ ok: false, message });
+  }
+});
+
+router.post("/products/:id/ranking-change-analysis", async (req, res) => {
+  const productRecord = await prisma.product.findUnique({ where: { id: req.params.id } });
+
+  if (!productRecord) {
+    res.status(404).json({ ok: false, message: "상품을 찾을 수 없습니다." });
+    return;
+  }
+
+  const trackingKeywords = productRecord.trackingKeywords.split(",").filter(Boolean);
+  const keyword = productRecord.primaryKeyword?.trim() || trackingKeywords[0] || "";
+
+  if (!keyword) {
+    res.status(400).json({ ok: false, message: "대표 키워드 또는 추적 키워드가 필요합니다." });
+    return;
+  }
+
+  const [rankResults, titleChangeLogs] = await Promise.all([
+    prisma.rankTrackingResult.findMany({
+      where: { productId: productRecord.id, keyword },
+      orderBy: { trackedAt: "asc" }
+    }),
+    prisma.titleChangeLog.findMany({
+      where: { productId: productRecord.id },
+      orderBy: { createdAt: "asc" }
+    })
+  ]);
+
+  if (rankResults.length === 0) {
+    res.status(400).json({ ok: false, message: "이 상품/키워드에 대한 순위 기록이 아직 없습니다." });
+    return;
+  }
+
+  try {
+    const detector = new RankingChangeDetector();
+    const result = await detector.analyze({
+      productId: productRecord.id,
+      keyword,
+      observations: mapRankTrackingResultsToObservations(rankResults),
+      changeEvents: mapTitleChangeLogsToChangeEvents(titleChangeLogs)
+    });
+    res.json({ ok: true, result });
+  } catch (caught) {
+    const message = caught instanceof Error ? caught.message : "순위 변화 분석에 실패했습니다.";
     res.status(502).json({ ok: false, message });
   }
 });

@@ -17,15 +17,29 @@ export type PublishTitleResult = {
   newName: string;
 };
 
-export async function publishProductTitleToNaver(product: PublishableProduct): Promise<PublishTitleResult> {
-  const newTitle = product.seoOptimizedTitle?.trim();
+export type OriginProductPayload = {
+  originProduct?: {
+    name?: string;
+    detailContent?: string;
+    leafCategoryId?: string;
+  };
+};
 
-  if (!newTitle) {
-    throw new Error("SEO 상품명을 먼저 입력해 주세요.");
-  }
+type ProductForFetch = {
+  originProductId: string | null;
+  apiAccountId: string | null;
+};
 
+/**
+ * 네이버 원상품 전체를 조회한다(이름/상세HTML/카테고리 등 포함) + 후속 쓰기(PUT)에 재사용할 수 있게
+ * accessToken/url도 함께 반환한다. 상품명 반영(publishProductTitleToNaver)과
+ * Content Quality Analyzer용 실데이터 조회(라우트)가 이 함수를 공유한다.
+ */
+export async function fetchNaverOriginProduct(
+  product: ProductForFetch
+): Promise<{ payload: OriginProductPayload; accessToken: string; url: string }> {
   if (!product.originProductId) {
-    throw new Error("원상품 ID 정보가 없어 전송할 수 없습니다. 스마트스토어 상품 불러오기를 다시 실행해 주세요.");
+    throw new Error("원상품 ID 정보가 없어 조회할 수 없습니다. 스마트스토어 상품 불러오기를 다시 실행해 주세요.");
   }
 
   if (!product.apiAccountId) {
@@ -60,14 +74,25 @@ export async function publishProductTitleToNaver(product: PublishableProduct): P
     throw new Error(await buildCommerceErrorMessage(getResponse, "네이버 상품 조회에 실패했습니다."));
   }
 
-  const current = (await getResponse.json()) as { originProduct?: { name?: string } };
+  const payload = (await getResponse.json()) as OriginProductPayload;
+  return { payload, accessToken, url };
+}
 
-  if (!current.originProduct) {
+export async function publishProductTitleToNaver(product: PublishableProduct): Promise<PublishTitleResult> {
+  const newTitle = product.seoOptimizedTitle?.trim();
+
+  if (!newTitle) {
+    throw new Error("SEO 상품명을 먼저 입력해 주세요.");
+  }
+
+  const { payload, accessToken, url } = await fetchNaverOriginProduct(product);
+
+  if (!payload.originProduct) {
     throw new Error("네이버 상품 응답 형식이 예상과 달라 반영할 수 없습니다.");
   }
 
-  const previousName = current.originProduct.name ?? null;
-  current.originProduct.name = newTitle;
+  const previousName = payload.originProduct.name ?? null;
+  payload.originProduct.name = newTitle;
 
   const putResponse = await fetch(url, {
     method: "PUT",
@@ -76,7 +101,7 @@ export async function publishProductTitleToNaver(product: PublishableProduct): P
       "Content-Type": "application/json",
       Accept: "application/json"
     },
-    body: JSON.stringify(current)
+    body: JSON.stringify(payload)
   });
 
   if (!putResponse.ok) {

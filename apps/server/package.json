@@ -14,6 +14,7 @@
     "prisma:seed": "tsx ../../prisma/seed.ts"
   },
   "dependencies": {
+    "@makeware/ai-seo-engine": "0.1.0",
     "@naver-seo-tracker/shared": "0.1.0",
     "@prisma/client": "^6.11.1",
     "bcryptjs": "^3.0.3",

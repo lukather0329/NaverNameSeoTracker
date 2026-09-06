@@ -1,0 +1,59 @@
+작업 지시 - 2026-09-07 세션 인계
+브랜치: feature/reports
+직전 세션(8/2) 이후 5주 만에 재접속, "8/2에 정리한 5개 우선순위를 순서대로 12시까지" 진행함.
+
+## 오늘 한 일 (2026-08-02.txt의 5개 우선순위 전부 진행)
+
+1. **Ranking Change Detector 데이터 소스 결정**: 사용자가 "기존 RankTrackingResult 그대로
+   사용"으로 확정. apps/server/src/services/ai-seo-engine-adapter.ts 신설
+   (RankTrackingResult -> RankObservation[], TitleChangeLog -> ChangeEvent[] 매핑).
+
+2. **@makeware/ai-seo-engine을 apps/server에 실제로 연결**: dependencies에 추가,
+   실제 라우트 3개 추가하고 전부 진짜 DB/네이버 데이터로 테스트까지 완료:
+   - POST /api/products/:id/semantic-analysis
+   - POST /api/products/:id/content-quality-analysis (네이버 실제 원상품의 detailContent를
+     실시간 조회해서 분석 - fetchNaverOriginProduct를 publishProductTitleToNaver와 공유하도록
+     리팩터링해서 토큰 발급 중복 호출 없앰)
+   - POST /api/products/:id/ranking-change-analysis
+   실제 결과: Semantic은 카테고리 불일치를 잡아냄, Content는 진짜 네이버 상품이 이미지 2장뿐인
+   빈 상세페이지라는 걸 잡아냄(F등급), Ranking은 "비교할 이전 데이터가 없다"는 걸 정직하게
+   보고함(허위로 추세를 만들어내지 않음).
+
+3. **Monte Carlo Predictor를 실제 rw_decision_engine에 연결**: packages/ai-seo-engine/src/prediction/
+   monte-carlo-http-adapter.ts 신설. CHANGE_PRODUCT_NAME 시나리오는 실제 엔진
+   (D:\Claude\MonteCarloDecisionEngine, 포트 8765)의 /naver-seo/simulate를 호출하고,
+   그 외 액션 타입은 호출자가 준 estimatedImpactRange/probabilityDistribution을 정규분포
+   근사로 변환한 추정치를 쓰며 "실제 시뮬레이션 아님"을 명시함. 실제 엔진 켜서 실호출까지 확인함.
+
+4. **AnthropicLlmProvider 구현**: packages/ai-seo-engine/src/llm/anthropic-llm-provider.ts.
+   SDK 의존성 추가 없이 fetch로 Messages API 직접 호출. JSON 파싱 실패해도 예외 던지지 않고
+   빈 결과 반환(규칙 기반 분석에 영향 없음). 실제 API 키가 없어서 mock으로만 검증함(테스트 5개).
+
+5. **Review Intelligence 실구현**: packages/ai-seo-engine/src/reviews/review-intelligence.ts
+   (RuleBasedReviewIntelligence). 감정 추정(별점 우선, 없으면 키워드), 주제 추출, 짧은/중복
+   리뷰 감지, FAQ 후보, 개선요구사항 추출까지 전부 구현. 리뷰 데이터를 실제로 어디서 가져올지는
+   여전히 미정이라 서버 라우트에는 아직 연결 안 함 - 분석 로직 자체는 데이터 출처를 몰라도
+   되므로 먼저 완성해둠.
+
+- 테스트 82개 전부 통과(오늘 23개 추가). 전체 워크스페이스 build/lint 깨끗함.
+- 부수 발견: apps/server에 루트와 별도인 자체 .env가 있는데 ENCRYPTION_SECRET이 아예 없었음
+  (루트 .env엔 있었지만 실제로 안 읽힘 - dotenv/config가 CWD 기준이라 apps/server/.env가
+  우선됨). 진짜 랜덤 시크릿 생성해서 채워넣음(.env는 git 추적 안 됨, 커밋에는 안 들어감).
+
+## 다음에 확인/처리할 것 (우선순위순)
+
+1. Experiment Manager Prisma 매핑 어댑터 - 다른 3개 엔진(Semantic/Content/Ranking)은 이미
+   연결됐는데 Experiment Manager만 아직 라우트 연결 안 됨. 기존 SeoExperiment Prisma 모델과
+   패키지의 SeoExperiment 타입이 필드가 비슷하지만 다름 - 매핑 필요.
+2. Review Intelligence 실제 리뷰 데이터 소스 확정 (네이버 커머스 API에 리뷰 조회 엔드포인트
+   있는지 확인 필요) - 확정되면 라우트 연결은 다른 3개처럼 금방 가능.
+3. Authority Score 실구현 (아직 인터페이스만).
+4. 실제 Anthropic API 키로 AnthropicLlmProvider 통합 테스트 (지금은 mock만 검증됨).
+5. (지난 8/2부터 이월) 순위 데이터 자동 수집 방식 재검토 - 지금은 MockRankProvider로만
+   RankTrackingJob이 돌고 있음(백그라운드 스케줄러가 계속 mock 데이터를 쌓고 있는 상태).
+   실제 네이버 순위를 어떻게 수집할지(수동/저빈도/판매지표 프록시/유료 API)는 여전히 미결정.
+
+## 재기동/동기화 방법
+
+- 서버_실행.exe 더블클릭 (엔진+서버+웹 한번에, cmd 창 없음)
+- 깃허브_동기화.bat / 받기.bat / 푸시.bat 더블클릭

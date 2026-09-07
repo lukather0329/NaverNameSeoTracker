@@ -49,13 +49,13 @@ class ServerLauncher
             }
         }
 
-        // 2) 트래커 서버(4300) + 웹(5173) - 루트 package.json의 "dev" 스크립트가 concurrently로 둘 다 띄움
+        // 2) 트래커 서버(4300) + 웹(9080) - 루트 package.json의 "dev" 스크립트가 concurrently로 둘 다 띄움
         bool p4300 = IsPortOpenAny(4300);
-        bool p5173 = IsPortOpenAny(5173);
-        Trace("port check 4300=" + p4300 + " 5173=" + p5173);
-        if (p4300 && p5173)
+        bool pWeb = IsPortOpenAny(9080);
+        Trace("port check 4300=" + p4300 + " 9080=" + pWeb);
+        if (p4300 && pWeb)
         {
-            skipped.Add("트래커 서버+웹 (4300 / 5173) - 이미 실행 중");
+            skipped.Add("트래커 서버+웹 (4300 / 9080) - 이미 실행 중");
         }
         else
         {
@@ -63,7 +63,7 @@ class ServerLauncher
             string trackerArgs = "/c npm run dev > \"" + trackerLog + "\" 2>&1";
             if (RunHidden("cmd.exe", trackerArgs, RepoDir))
             {
-                started.Add("트래커 서버+웹 (4300, 5173)");
+                started.Add("트래커 서버+웹 (4300, 9080)");
             }
             else
             {
@@ -84,7 +84,7 @@ class ServerLauncher
         {
             message += "실패:\r\n - " + string.Join("\r\n - ", failed.ToArray()) + "\r\n\r\n";
         }
-        message += "로그 위치: " + LogDir + "\r\n\r\n실제로 뜰 때까지 몇 초 걸릴 수 있습니다.\r\n엔진: http://127.0.0.1:8765/health\r\n웹: http://localhost:5173";
+        message += "로그 위치: " + LogDir + "\r\n\r\n실제로 뜰 때까지 몇 초 걸릴 수 있습니다.\r\n엔진: http://127.0.0.1:8765/health\r\n웹: http://localhost:9080";
 
         Trace(message.Replace("\r\n", " | "));
 

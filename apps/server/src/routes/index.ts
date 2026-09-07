@@ -9,8 +9,12 @@ import { testNaverApiConnection } from "../services/naver-api-test-service.js";
 import { importProductsFromCommerceAccount } from "../services/naver-commerce-product-import-service.js";
 import { fetchNaverOriginProduct, publishProductTitleToNaver } from "../services/naver-product-publish-service.js";
 import { findActiveShoppingSearchCredentials, runTrackingJob } from "../services/rank-tracking-service.js";
-import { ContentQualityAnalyzer, RankingChangeDetector, SemanticAnalyzer } from "@makeware/ai-seo-engine";
-import { mapRankTrackingResultsToObservations, mapTitleChangeLogsToChangeEvents } from "../services/ai-seo-engine-adapter.js";
+import { ContentQualityAnalyzer, ExperimentManager, RankingChangeDetector, SemanticAnalyzer } from "@makeware/ai-seo-engine";
+import {
+  mapRankTrackingResultsToObservations,
+  mapSeoExperimentToEngineExperiment,
+  mapTitleChangeLogsToChangeEvents
+} from "../services/ai-seo-engine-adapter.js";
 
 const router = Router();
 
@@ -661,6 +665,47 @@ router.post("/products/:id/ranking-change-analysis", async (req, res) => {
     const message = caught instanceof Error ? caught.message : "순위 변화 분석에 실패했습니다.";
     res.status(502).json({ ok: false, message });
   }
+});
+
+// 상품에 걸린 모든 실험(SeoExperiment)을 ExperimentManager로 타임라인화하고,
+// 실험별로 상품명 변경 전/후 스냅샷 비교를 함께 반환한다. 기존 실험 CRUD 라우트는
+// 그대로 두고(엔진의 상태 전이 검증을 다시 태우면 이미 저장된 PAUSED/FAILED 등
+// 엔진에 없는 상태값과 충돌할 수 있음), 이 라우트는 읽기 전용 인사이트만 추가한다.
+router.get("/products/:id/experiment-timeline", async (req, res) => {
+  const productRecord = await prisma.product.findUnique({ where: { id: req.params.id } });
+
+  if (!productRecord) {
+    res.status(404).json({ ok: false, message: "상품을 찾을 수 없습니다." });
+    return;
+  }
+
+  const experiments = await prisma.seoExperiment.findMany({
+    where: { productId: productRecord.id },
+    orderBy: { createdAt: "asc" },
+    include: { keywords: true }
+  });
+
+  if (experiments.length === 0) {
+    res.status(400).json({ ok: false, message: "이 상품에 등록된 실험이 아직 없습니다." });
+    return;
+  }
+
+  const mapped = experiments.map((experiment) =>
+    mapSeoExperimentToEngineExperiment(
+      experiment,
+      experiment.keywords.map((k) => k.keyword)
+    )
+  );
+
+  const manager = new ExperimentManager();
+  const timeline = manager.buildTimeline(mapped);
+  const comparisons = mapped.map((experiment) => ({
+    experimentId: experiment.id,
+    name: experiment.name,
+    comparison: manager.compareSnapshots(experiment.beforeSnapshot, experiment.afterSnapshot)
+  }));
+
+  res.json({ ok: true, timeline, comparisons });
 });
 
 router.post("/title-candidates", async (req, res) => {
